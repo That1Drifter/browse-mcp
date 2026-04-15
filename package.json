@@ -1,0 +1,33 @@
+{
+  "name": "browse-mcp",
+  "version": "0.1.0",
+  "description": "Headless browser MCP server with snapshot-diff and annotated screenshots",
+  "license": "MIT",
+  "author": "Roger Maxwell (That1Drifter) <americanemt@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/That1Drifter/browse-mcp"
+  },
+  "homepage": "https://github.com/That1Drifter/browse-mcp",
+  "bugs": "https://github.com/That1Drifter/browse-mcp/issues",
+  "type": "module",
+  "bin": {
+    "browse-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "axe-core": "^4.11.3",
+    "playwright": "^1.49.0",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  }
+}

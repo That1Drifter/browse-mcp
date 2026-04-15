@@ -1,0 +1,28 @@
+node_modules/
+dist/
+
+# scratch / experiment scripts and their outputs
+*-results.json
+*-results.txt
+*-results*.json
+chopperexchange-*.txt
+chopperexchange-*.mjs
+chopperexchange.mjs
+cycletrader.mjs
+motohunt-*.mjs
+motohunt-*.json
+motohunt-*.txt
+edge-cases-report.txt
+edge-cases.mjs
+listings-test.mjs
+phase2-test.mjs
+phase3-test.mjs
+phase4-diag.mjs
+phase4-test.mjs
+research.mjs
+smoke-test.mjs
+
+# logs / OS
+*.log
+.DS_Store
+Thumbs.db
