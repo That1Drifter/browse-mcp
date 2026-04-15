@@ -1,15 +1,39 @@
 {
   "name": "browse-mcp",
-  "version": "0.1.0",
-  "description": "Headless browser MCP server with snapshot-diff and annotated screenshots",
+  "version": "0.2.0",
+  "description": "Headless-browser MCP server for Claude — Playwright-based, with accessibility-tree refs, Readability, search, annotated screenshots, and a self-improvement feedback loop.",
   "license": "MIT",
   "author": "Roger Maxwell (That1Drifter) <americanemt@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/That1Drifter/browse-mcp"
+    "url": "git+https://github.com/That1Drifter/browse-mcp.git"
   },
-  "homepage": "https://github.com/That1Drifter/browse-mcp",
+  "homepage": "https://github.com/That1Drifter/browse-mcp#readme",
   "bugs": "https://github.com/That1Drifter/browse-mcp/issues",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "anthropic",
+    "playwright",
+    "browser",
+    "headless",
+    "accessibility-tree",
+    "web-scraping",
+    "readability",
+    "search",
+    "agent"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist/",
+    "src/",
+    "LICENSE",
+    "NOTICE.md",
+    "README.md"
+  ],
   "type": "module",
   "bin": {
     "browse-mcp": "dist/index.js"
@@ -18,7 +42,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "prepack": "tsc"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
