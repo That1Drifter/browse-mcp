@@ -10,7 +10,7 @@ export interface SnapshotOptions {
 // In-page function literal as a string. Takes a "frame prefix" so refs
 // are unique across frames. Pierces open shadow roots. Skips iframes —
 // those are handled at the Playwright level (per-frame invocation).
-const PAGE_FN = `(framePrefix) => {
+const PAGE_FN = `(framePrefix, scopeSelector) => {
   const INTERACTIVE_TAGS = new Set(['A','BUTTON','INPUT','TEXTAREA','SELECT','SUMMARY','OPTION']);
   const INTERACTIVE_ROLES = new Set(['button','link','textbox','checkbox','radio','combobox','menuitem','option','searchbox','switch','tab']);
 
@@ -33,18 +33,45 @@ const PAGE_FN = `(framePrefix) => {
     return false;
   };
 
+  const NOISE_NAME_TAGS = new Set(['SCRIPT','STYLE','NOSCRIPT','TEMPLATE','LINK']);
+  const looksLikeCode = (s) => {
+    if (!s) return false;
+    if (s.length > 200 && /[{};=]/.test(s) && !/\s[A-Za-z]{3,}\s[A-Za-z]{3,}/.test(s.slice(0, 200))) return true;
+    return /^(\(function|function\s*\(|!function|var\s|let\s|const\s|window\.|document\.|@media|@keyframes|@import|@font-face|body\s*\{|html\s*\{|\.[\w-]+\s*\{|#[\w-]+\s*\{|\/\*)/.test(s);
+  };
+  // Collect text content skipping script/style/noscript/template descendants.
+  const textExcludingNoise = (el, limit) => {
+    let t = '';
+    const stack = [el];
+    while (stack.length && t.length < limit) {
+      const n = stack.pop();
+      if (!n) continue;
+      if (n.nodeType === 3) { t += n.textContent || ''; continue; }
+      if (n.nodeType !== 1) continue;
+      if (NOISE_NAME_TAGS.has(n.tagName)) continue;
+      if (n.childNodes) for (let i = n.childNodes.length - 1; i >= 0; i--) stack.push(n.childNodes[i]);
+    }
+    return t;
+  };
+
   const accName = (el) => {
     try {
+      if (NOISE_NAME_TAGS.has(el.tagName)) return '';
       if (el.getAttribute('aria-label')) return el.getAttribute('aria-label').trim();
       if (el.tagName === 'INPUT' && el.labels && el.labels[0]) return el.labels[0].textContent.trim();
       if (el.getAttribute('placeholder')) return el.getAttribute('placeholder').trim();
       if (el.getAttribute('alt')) return el.getAttribute('alt').trim();
       if (el.getAttribute('title')) return el.getAttribute('title').trim();
       let t = '';
-      for (const c of el.childNodes) if (c.nodeType === 3) t += c.textContent;
+      for (const c of el.childNodes) {
+        if (c.nodeType === 3) t += c.textContent;
+        else if (c.nodeType === 1 && NOISE_NAME_TAGS.has(c.tagName)) continue;
+      }
       t = t.trim();
       if (t) return t.slice(0, 100);
-      return (el.textContent || '').trim().slice(0, 80);
+      const full = textExcludingNoise(el, 200).trim();
+      if (looksLikeCode(full)) return '';
+      return full.slice(0, 80);
     } catch { return ''; }
   };
 
@@ -119,7 +146,7 @@ const PAGE_FN = `(framePrefix) => {
   const cursorCounter = cCounter;
 
   // Third pass: build text tree (pierce shadow DOM, mark iframes as leaves)
-  const SKIP_TAGS = new Set(['SCRIPT','STYLE','NOSCRIPT','META','LINK','HEAD']);
+  const SKIP_TAGS = new Set(['SCRIPT','STYLE','NOSCRIPT','META','LINK','HEAD','TEMPLATE']);
   const build = (el, depth) => {
     if (!el || el.nodeType !== 1) return null;
     if (SKIP_TAGS.has(el.tagName)) return null;
@@ -154,20 +181,30 @@ const PAGE_FN = `(framePrefix) => {
     return node;
   };
 
-  const tree = build(document.documentElement, 0);
+  let rootEl = document.documentElement;
+  let scopeMatched = true;
+  if (scopeSelector) {
+    try {
+      const match = document.querySelector(scopeSelector);
+      if (match) { rootEl = match; scopeMatched = true; }
+      else { scopeMatched = false; }
+    } catch { scopeMatched = false; }
+  }
+  const tree = scopeMatched ? build(rootEl, 0) : null;
   const iframes = [];
   if (document.querySelectorAll) {
     document.querySelectorAll('iframe').forEach((f, i) => {
       iframes.push({ index: i, src: f.getAttribute('src') || '' });
     });
   }
-  return { tree, iframes, tagged: counter, cursorTagged: cursorCounter };
+  return { tree, iframes, tagged: counter, cursorTagged: cursorCounter, scopeMatched };
 }`;
 
 interface FrameResult {
   tree: any;
   iframes: { index: number; src: string }[];
   tagged: number;
+  scopeMatched?: boolean;
 }
 
 interface FrameData {
@@ -177,23 +214,25 @@ interface FrameData {
   result: FrameResult;
 }
 
-async function runInFrame(frame: Frame, framePrefix: string): Promise<FrameData | null> {
+async function runInFrame(frame: Frame, framePrefix: string, scopeSelector?: string): Promise<FrameData | null> {
   try {
-    const result = await frame.evaluate(`(${PAGE_FN})(${JSON.stringify(framePrefix)})`) as FrameResult;
+    const args = `${JSON.stringify(framePrefix)}, ${JSON.stringify(scopeSelector || '')}`;
+    const result = await frame.evaluate(`(${PAGE_FN})(${args})`) as FrameResult;
     return { framePrefix, frame, url: frame.url(), result };
   } catch {
     return null;
   }
 }
 
-export async function collectFrames(page: Page): Promise<FrameData[]> {
+export async function collectFrames(page: Page, scopeSelector?: string): Promise<FrameData[]> {
   const frames = page.frames();
   const out: FrameData[] = [];
   for (let i = 0; i < frames.length; i++) {
     const f = frames[i];
     // Playwright returns the main frame first, then descendants.
     const prefix = i === 0 ? '' : `f${i}`;
-    const data = await runInFrame(f, prefix);
+    // Only the main frame respects the scope selector.
+    const data = await runInFrame(f, prefix, i === 0 ? scopeSelector : undefined);
     if (data) out.push(data);
   }
   return out;
@@ -203,6 +242,16 @@ function isCursorRef(ref: string | undefined): boolean {
   if (!ref) return false;
   // Strip optional frame prefix (f<digits>) then check for 'c'
   return /^(?:f\d+)?c\d+$/.test(ref);
+}
+
+// Defense-in-depth: if a [generic] node's "name" still looks like inline
+// script/CSS source (e.g. leaked via shadow DOM or unusual markup), drop it.
+const CODE_LIKE_RE = /^(\(function|function\s*\(|!function|var\s|let\s|const\s|window\.|document\.|@media|@keyframes|@import|@font-face|body\s*\{|html\s*\{|\.[\w-]+\s*\{|#[\w-]+\s*\{|\/\*)/;
+function isNoisyName(role: string, name: string): boolean {
+  if (role !== 'generic' || !name) return false;
+  if (CODE_LIKE_RE.test(name)) return true;
+  if (name.length > 200 && /[{};=]/.test(name)) return true;
+  return false;
 }
 
 export function renderTree(
@@ -220,7 +269,8 @@ export function renderTree(
   if (showThis) {
     const indent = '  '.repeat(depth);
     const refStr = node.ref ? `@${node.ref} ` : '';
-    const nameStr = node.name ? ` "${String(node.name).replace(/\s+/g, ' ').slice(0, 80)}"` : '';
+    const cleanName = node.name && !isNoisyName(node.role, String(node.name)) ? String(node.name) : '';
+    const nameStr = cleanName ? ` "${cleanName.replace(/\s+/g, ' ').slice(0, 80)}"` : '';
     const levelAttr = typeof node.tag === 'string' ? node.tag.match(/^H(\d)$/) : null;
     const extra: string[] = [];
     if (levelAttr) extra.push(`level=${levelAttr[1]}`);
@@ -252,8 +302,16 @@ export async function snapshot(
   page: Page,
   opts: SnapshotOptions = {}
 ): Promise<string> {
-  const frames = await collectFrames(page);
+  const frames = await collectFrames(page, opts.selector);
   if (frames.length === 0) return '(no frames)';
+
+  // If a scope selector was requested but the main frame reported no match, error clearly.
+  if (opts.selector) {
+    const main = frames.find((f) => f.framePrefix === '');
+    if (main && main.result && main.result.scopeMatched === false) {
+      return `(no element matched selector ${JSON.stringify(opts.selector)})`;
+    }
+  }
 
   const parts: string[] = [];
   for (const fd of frames) {
@@ -264,11 +322,11 @@ export async function snapshot(
       cursorInteractive: opts.cursorInteractive,
     };
     if (fd.framePrefix === '') {
-      const rendered = opts.selector
-        ? renderScopedTree(fd.result.tree, opts)
-        : renderTree(fd.result.tree, renderOpts);
+      const rendered = renderTree(fd.result.tree, renderOpts);
       if (rendered.trim()) parts.push(rendered);
     } else {
+      // When scoping the main frame, skip child-frame trees unless they'd be useful.
+      if (opts.selector) continue;
       const rendered = renderTree(fd.result.tree, renderOpts);
       if (rendered.trim()) {
         parts.push(`\n--- frame ${fd.framePrefix} (${fd.url}) ---\n${rendered}`);
@@ -276,12 +334,6 @@ export async function snapshot(
     }
   }
   return parts.join('\n') || '(empty)';
-}
-
-function renderScopedTree(root: any, opts: SnapshotOptions): string {
-  // Find a node matching the CSS selector via its tagged descendants.
-  // Simple implementation: fall back to full render.
-  return renderTree(root, { interactive: opts.interactive, maxDepth: opts.maxDepth });
 }
 
 export interface ResolvedRef {
