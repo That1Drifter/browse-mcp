@@ -199,6 +199,10 @@ Override the data dir with `BROWSE_MCP_HOME`.
 - **Search via DDG HTML endpoint + Bing fallback** sidesteps the bot-detection pages the JS-rendered SERPs serve to headless browsers.
 - **Readability is fetched from unpkg at runtime** on first `browser_read` call and cached in module scope — no npm dep, no extra build step.
 
+## Versioning
+
+See [VERSIONING.md](VERSIONING.md) for the semver contract (what counts as a breaking change, what's minor, what's patch) and [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## License & attribution
 
 MIT — see [LICENSE](LICENSE).
