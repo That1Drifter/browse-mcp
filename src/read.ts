@@ -1,14 +1,18 @@
 import type { Page } from 'playwright';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 
-// Readability source cached in module scope — fetched once per MCP session.
-const READABILITY_URL = 'https://unpkg.com/@mozilla/readability@0.5.0/Readability.js';
+// Readability source bundled via the @mozilla/readability npm dep. We load the
+// plain browser-compatible Readability.js from the installed package and
+// inject it into the page via addScriptTag (same pattern as before, but no
+// runtime network fetch).
+const require_ = createRequire(import.meta.url);
 let readabilitySrc: string | null = null;
 
-async function loadReadability(): Promise<string> {
+function loadReadability(): string {
   if (readabilitySrc) return readabilitySrc;
-  const res = await fetch(READABILITY_URL);
-  if (!res.ok) throw new Error(`Failed to fetch Readability: HTTP ${res.status}`);
-  readabilitySrc = await res.text();
+  const path = require_.resolve('@mozilla/readability/Readability.js');
+  readabilitySrc = readFileSync(path, 'utf8');
   return readabilitySrc;
 }
 
@@ -32,7 +36,7 @@ export async function readArticle(page: Page, opts: ReadOptions): Promise<Readab
   if (opts.url) {
     await page.goto(opts.url, { waitUntil: 'domcontentloaded' });
   }
-  const src = await loadReadability();
+  const src = loadReadability();
   await page.addScriptTag({ content: src });
   const result = await page.evaluate(() => {
     // @ts-ignore — Readability injected via addScriptTag
