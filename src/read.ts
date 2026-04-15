@@ -72,10 +72,10 @@ export function htmlToMarkdown(html: string): string {
   for (const tok of tokens) {
     const top = stack[stack.length - 1];
     if (tok.type === 'text') {
-      top.children.push({ type: 'text', value: tok.value });
+      top.children!.push({ type: 'text', value: tok.value });
     } else if (tok.type === 'open') {
       const node: Node = { type: 'elem', tag: tok.tag, attrs: tok.attrs, children: [] };
-      top.children.push(node);
+      top.children!.push(node);
       if (!VOID.has(tok.tag) && !tok.selfClosing) stack.push(node);
     } else if (tok.type === 'close') {
       // pop until matching tag (forgiving)
