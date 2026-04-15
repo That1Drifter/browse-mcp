@@ -65,7 +65,15 @@ const COLLECT_FN = `(opts) => {
         if (u.origin !== pageOrigin) continue;
       } catch { continue; }
     }
-    const text = (a.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 120);
+    // Fallback chain: visible text → aria-label → title → alt of nested img.
+    let text = (a.textContent || '').replace(/\\s+/g, ' ').trim();
+    if (!text) text = (a.getAttribute('aria-label') || '').trim();
+    if (!text) text = (a.getAttribute('title') || '').trim();
+    if (!text) {
+      const img = a.querySelector && a.querySelector('img[alt]');
+      if (img) text = (img.getAttribute('alt') || '').trim();
+    }
+    text = text.slice(0, 120);
     if (!textTest(text)) continue;
     const ref = a.getAttribute('data-browse-ref') || undefined;
     const entry = { text, href };

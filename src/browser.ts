@@ -28,6 +28,7 @@ class BrowserManager {
   private mode: 'headless' | 'headed' = 'headless';
   private dataDir: string = DEFAULT_DATA_DIR;
   private cdp: CDPSession | null = null;
+  private loggerAttached: WeakSet<Page> = new WeakSet();
   consoleLog: ConsoleEntry[] = [];
   networkLog: NetworkEntry[] = [];
   lastSnapshot: string = '';
@@ -81,6 +82,8 @@ class BrowserManager {
   }
 
   private attachLoggers(page: Page) {
+    if (this.loggerAttached.has(page)) return;
+    this.loggerAttached.add(page);
     page.on('console', (msg: ConsoleMessage) => {
       this.consoleLog.push({
         type: msg.type(),
