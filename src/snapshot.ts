@@ -5,6 +5,7 @@ export interface SnapshotOptions {
   maxDepth?: number;
   selector?: string;
   cursorInteractive?: boolean;
+  noCollapse?: boolean;
 }
 
 // In-page function literal as a string. Takes a "frame prefix" so refs
@@ -254,12 +255,56 @@ function isNoisyName(role: string, name: string): boolean {
   return false;
 }
 
+// Roles that should never be collapsed away even if they're single-child
+// wrappers — they convey structural semantics a reader relies on.
+const STRUCTURAL_ROLES = new Set([
+  'heading',
+  'navigation',
+  'main',
+  'banner',
+  'contentinfo',
+  'complementary',
+  'region',
+  'form',
+  'search',
+  'list',
+  'listitem',
+  'article',
+  'section',
+]);
+
+// Decide whether a [generic] wrapper node can be collapsed into its sole
+// child. Collapses chains of meaningless nested divs that SPA frameworks
+// stack around real content.
+function isCollapsibleGeneric(node: any): boolean {
+  if (!node || node.role !== 'generic') return false;
+  if (node.ref) return false;
+  if (node.isIframe || node.shadow) return false;
+  if (!node.children || node.children.length !== 1) return false;
+  const child = node.children[0];
+  if (!child) return false;
+  const cleanName = node.name && !isNoisyName(node.role, String(node.name)) ? String(node.name).trim() : '';
+  if (!cleanName) return true;
+  // Name bubbles up from descendants — if our name matches the sole child's
+  // name (or its name, trimmed), the wrapper is redundant.
+  const childName = child.name ? String(child.name).trim() : '';
+  if (childName && cleanName === childName) return true;
+  return false;
+}
+
 export function renderTree(
   node: any,
-  opts: { interactive?: boolean; maxDepth?: number; cursorInteractive?: boolean } = {},
+  opts: { interactive?: boolean; maxDepth?: number; cursorInteractive?: boolean; noCollapse?: boolean } = {},
   depth = 0
 ): string {
   if (!node) return '';
+  // Collapse chains of single-child generic wrappers: walk down until we
+  // hit something meaningful, then render that at the current depth.
+  if (!opts.noCollapse) {
+    while (isCollapsibleGeneric(node)) {
+      node = node.children[0];
+    }
+  }
   const lines: string[] = [];
   // Hide @c refs unless cursorInteractive is enabled
   const refIsCursor = isCursorRef(node.ref);
@@ -281,13 +326,33 @@ export function renderTree(
   }
 
   if (node.children && (opts.maxDepth === undefined || depth < opts.maxDepth)) {
+    // Dedupe consecutive identical first-lines from children. Defensive
+    // against shadow-DOM-merged trees producing twin [generic] "X" wrappers.
+    let prevFirstLine: string | null = null;
     for (const c of node.children) {
       const sub = renderTree(c, opts, depth + 1);
-      if (sub) lines.push(sub);
+      if (!sub) continue;
+      const firstLine = sub.split('\n', 1)[0];
+      if (
+        !opts.noCollapse &&
+        prevFirstLine !== null &&
+        firstLine === prevFirstLine &&
+        // Only dedupe nameless or named pure generic lines, never refs/landmarks.
+        /^\s*\[generic\]/.test(firstLine) &&
+        sub === firstLine // single-line subtree
+      ) {
+        continue;
+      }
+      lines.push(sub);
+      prevFirstLine = firstLine;
     }
   }
   return lines.join('\n');
 }
+
+// STRUCTURAL_ROLES is referenced via isCollapsibleGeneric's role check
+// (it only collapses 'generic'); exported for potential future tuning.
+export { STRUCTURAL_ROLES };
 
 function hasInteractiveDescendant(node: any, includeCursor = false): boolean {
   if (!node.children) return false;
@@ -320,6 +385,7 @@ export async function snapshot(
       interactive: opts.interactive,
       maxDepth: opts.maxDepth,
       cursorInteractive: opts.cursorInteractive,
+      noCollapse: opts.noCollapse,
     };
     if (fd.framePrefix === '') {
       const rendered = renderTree(fd.result.tree, renderOpts);
