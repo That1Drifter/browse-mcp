@@ -17,6 +17,47 @@ export interface InspectResult {
   boxModel: { width: number; height: number; x: number; y: number } | null;
 }
 
+// Maps shorthand CSS properties to the longhands they expand to.
+// Used by formatInspect() to suppress computed longhand noise when the
+// author-declared shorthand is present in the same rule.
+const SHORTHAND_LONGHANDS: Record<string, string[]> = {
+  margin: ['margin-top', 'margin-right', 'margin-bottom', 'margin-left'],
+  padding: ['padding-top', 'padding-right', 'padding-bottom', 'padding-left'],
+  border: [
+    'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+    'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
+    'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+    'border-width', 'border-style', 'border-color',
+  ],
+  'border-top': ['border-top-width', 'border-top-style', 'border-top-color'],
+  'border-right': ['border-right-width', 'border-right-style', 'border-right-color'],
+  'border-bottom': ['border-bottom-width', 'border-bottom-style', 'border-bottom-color'],
+  'border-left': ['border-left-width', 'border-left-style', 'border-left-color'],
+  font: ['font-style', 'font-variant', 'font-weight', 'font-stretch', 'font-size', 'line-height', 'font-family'],
+  background: [
+    'background-color', 'background-image', 'background-repeat', 'background-attachment',
+    'background-position', 'background-position-x', 'background-position-y',
+    'background-size', 'background-origin', 'background-clip',
+  ],
+  animation: [
+    'animation-name', 'animation-duration', 'animation-timing-function', 'animation-delay',
+    'animation-iteration-count', 'animation-direction', 'animation-fill-mode', 'animation-play-state',
+  ],
+  transition: ['transition-property', 'transition-duration', 'transition-timing-function', 'transition-delay'],
+  flex: ['flex-grow', 'flex-shrink', 'flex-basis'],
+  grid: [
+    'grid-template-rows', 'grid-template-columns', 'grid-template-areas',
+    'grid-auto-rows', 'grid-auto-columns', 'grid-auto-flow',
+    'grid-row-gap', 'grid-column-gap',
+  ],
+  'list-style': ['list-style-type', 'list-style-position', 'list-style-image'],
+  outline: ['outline-width', 'outline-style', 'outline-color'],
+  overflow: ['overflow-x', 'overflow-y'],
+  'place-items': ['align-items', 'justify-items'],
+  'place-content': ['align-content', 'justify-content'],
+  'place-self': ['align-self', 'justify-self'],
+};
+
 const INTERESTING_COMPUTED = [
   'display', 'position', 'top', 'left', 'right', 'bottom', 'width', 'height',
   'margin', 'padding', 'border', 'background-color', 'color', 'font-size',
@@ -154,7 +195,17 @@ export function formatInspect(r: InspectResult): string {
   const other = r.matchedRules.filter((x) => x.origin !== 'regular' && x.origin !== 'author' && x.origin !== 'inline');
   for (const rule of [...r.matchedRules.filter((x) => x.origin === 'inline'), ...author, ...other]) {
     lines.push(`  [${rule.origin}] ${rule.selector}${rule.source ? ` (${rule.source})` : ''}`);
+    const declared = new Set(rule.properties.map((p) => p.name));
+    const suppressed = new Set<string>();
+    for (const name of declared) {
+      const longhands = SHORTHAND_LONGHANDS[name];
+      if (!longhands) continue;
+      for (const lh of longhands) {
+        if (declared.has(lh)) suppressed.add(lh);
+      }
+    }
     for (const p of rule.properties) {
+      if (suppressed.has(p.name)) continue;
       lines.push(`    ${p.name}: ${p.value}${p.important ? ' !important' : ''}`);
     }
   }

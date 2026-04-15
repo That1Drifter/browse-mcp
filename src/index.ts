@@ -507,7 +507,24 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           }
           throw e;
         }
-        return text(`Navigated to ${page.url()}`);
+        let msg = `Navigated to ${page.url()}`;
+        try {
+          const currentUrl = page.url();
+          const urlHit = /\/static-pages\/418|\/cdn-cgi\/|\/distil_r_captcha|\/_recaptcha/i.test(currentUrl);
+          const bodyHit = await Promise.race([
+            page.evaluate(() => {
+              const t = (document.body?.innerText || '').toLowerCase();
+              const title = (document.title || '').toLowerCase();
+              const needles = ['checking your browser', 'verify you are human', 'captcha', 'cloudflare', 'challenge'];
+              return needles.some((n) => t.includes(n) || title.includes(n));
+            }),
+            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 300)),
+          ]);
+          if (urlHit || bodyHit) {
+            msg += `\n\n[heads-up] Looks like a bot-detection / CAPTCHA interstitial. Consider browser_handoff to let the user solve it interactively.`;
+          }
+        } catch { /* silent */ }
+        return text(msg);
       }
 
       case 'browser_snapshot': {
