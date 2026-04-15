@@ -22,3 +22,5 @@ jobs:
       - run: npm run lint
         continue-on-error: true
       - run: npm run build
+      - run: npm test
+        if: matrix.node != '18'
