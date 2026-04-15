@@ -5,6 +5,7 @@ export interface LinksOptions {
   textPattern?: string;        // case-insensitive substring
   sameOriginOnly?: boolean;
   max?: number;
+  includeUnlabeled?: boolean;  // include anchors with no discoverable label
 }
 
 export interface LinkInfo {
@@ -16,7 +17,7 @@ export interface LinkInfo {
 // In-page collector. Pierces shadow DOM. Same-origin iframes are handled
 // separately at the Playwright level via page.frames().
 const COLLECT_FN = `(opts) => {
-  const { hrefPattern, textPattern, sameOriginOnly, framePrefix, pageOrigin } = opts;
+  const { hrefPattern, textPattern, sameOriginOnly, framePrefix, pageOrigin, includeUnlabeled } = opts;
 
   let hrefTest;
   if (hrefPattern) {
@@ -73,9 +74,23 @@ const COLLECT_FN = `(opts) => {
       const img = a.querySelector && a.querySelector('img[alt]');
       if (img) text = (img.getAttribute('alt') || '').trim();
     }
+    const ref = a.getAttribute('data-browse-ref') || undefined;
+    if (!text && includeUnlabeled) {
+      // Final fallback: slug from href path's last meaningful segment.
+      try {
+        const u = new URL(href);
+        const segs = u.pathname.split('/').filter(Boolean);
+        let slug = segs.length ? segs[segs.length - 1] : '';
+        // Strip trailing extension like .html, .php
+        slug = slug.replace(/\\.[a-zA-Z0-9]{1,5}$/, '');
+        try { slug = decodeURIComponent(slug); } catch (_e) {}
+        slug = slug.replace(/[_-]+/g, ' ').trim();
+        if (slug) text = slug;
+      } catch (_e) {}
+    }
+    if (!text && !ref && !includeUnlabeled) continue;
     text = text.slice(0, 120);
     if (!textTest(text)) continue;
-    const ref = a.getAttribute('data-browse-ref') || undefined;
     const entry = { text, href };
     if (ref) entry.ref = framePrefix ? (ref) : ref;
     out.push(entry);
@@ -113,6 +128,7 @@ export async function collectLinks(page: Page, opts: LinksOptions): Promise<Link
           sameOriginOnly: !!opts.sameOriginOnly,
           framePrefix,
           pageOrigin: mainOrigin,
+          includeUnlabeled: !!opts.includeUnlabeled,
         })})`
       ) as LinkInfo[];
     } catch {
