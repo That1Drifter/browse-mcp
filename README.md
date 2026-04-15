@@ -6,6 +6,18 @@
 
 A headless-browser MCP server for Claude (or any MCP client). Playwright-based, with accessibility-tree refs, Readability article extraction, search without an API key, a research macro that bundles search-and-read into one call, annotated screenshots, and a self-improvement feedback loop.
 
+## Project status
+
+**browse-mcp is pre-1.0 and actively developed by a single maintainer.** Treat it as early-stage software:
+
+- API surface (tool names, arguments, output shapes) may change between minor versions until 1.0.
+- Breaking changes are possible on any 0.x bump; pin a version in production use.
+- No community validation yet — you may be the first user to hit a given edge case.
+- Search endpoints scrape DuckDuckGo/Bing HTML and can break without notice (see issue #3).
+- The persistent Chromium profile stores cookies/sessions on disk — review issue #8 before trusting it with sensitive accounts.
+
+Feedback, bug reports, and PRs are welcome via the [issue tracker](https://github.com/That1Drifter/browse-mcp/issues). Near-term priorities live in [ROADMAP.md](./ROADMAP.md).
+
 ## Why another browser MCP?
 
 Microsoft's [playwright-mcp](https://github.com/microsoft/playwright-mcp) is excellent for test-style automation — it assumes you know what you want to do and drives the browser deterministically. browse-mcp is built for the opposite shape of task: **reading, researching, and scraping real-world pages from a conversational agent**, where the agent doesn't know the page structure in advance.
