@@ -249,7 +249,7 @@ const tools = [
   {
     name: 'browser_extract_listings',
     description:
-      'Extract structured listings from a results/search/catalog page. Handles the common pattern where each item has multiple anchor elements (image wrapper, title wrapper, etc.) — dedupes by href and keeps the richest anchor. Parses year, price, distance, location, image, new/used from each anchor\'s text. Use for marketplace/catalog scraping (motohunt, cycletrader, real estate, ecommerce). Returns a JSON array.',
+      'Extract structured listings from a results/search/catalog page. Two grouping strategies: "href" (marketplace cards — dedupe anchors by href, keep the richest wrapper) and "row" (HN/Reddit/blog — detect the repeating row container, pick the title anchor per row, other row anchors go to `meta`). Default "auto" tries row then falls back to href. Parses year, price, distance, location, image, new/used. Returns a JSON array.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -264,6 +264,11 @@ const tools = [
         container_selector: {
           type: 'string',
           description: 'Scope search to inside this CSS selector (e.g. ".results-grid")',
+        },
+        group_by: {
+          type: 'string',
+          enum: ['href', 'row', 'auto'],
+          description: 'Grouping mode. "href" = dedupe by URL (marketplace cards). "row" = detect repeating row container, pick title anchor per row, other anchors -> meta (HN/Reddit/blogs). "auto" (default) tries row, falls back to href.',
         },
       },
     },
@@ -702,6 +707,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           hrefPattern: a.href_pattern,
           requireText: a.require_text,
           containerSelector: a.container_selector,
+          groupBy: a.group_by,
         });
         return text(JSON.stringify(listings, null, 2));
       }
