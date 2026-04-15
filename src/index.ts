@@ -5,7 +5,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { browser } from './browser.js';
+import { browser, DEFAULT_DATA_DIR } from './browser.js';
+import { rm } from 'fs/promises';
 import { snapshot, resolveRef } from './snapshot.js';
 import { unifiedDiff } from './diff.js';
 import { annotatedScreenshot } from './annotate.js';
@@ -128,6 +129,7 @@ const tools = [
       properties: {
         errors_only: { type: 'boolean', description: 'Only error/warning entries' },
         clear: { type: 'boolean', description: 'Clear buffer after reading' },
+        all_tabs: { type: 'boolean', description: 'Include entries from every tab (prefixed with [tab N])' },
       },
     },
   },
@@ -139,6 +141,7 @@ const tools = [
       properties: {
         failed_only: { type: 'boolean', description: 'Only failed (status >= 400 or no response) requests' },
         clear: { type: 'boolean', description: 'Clear buffer after reading' },
+        all_tabs: { type: 'boolean', description: 'Include entries from every tab (prefixed with [tab N])' },
       },
     },
   },
@@ -484,6 +487,18 @@ const tools = [
       required: ['index'],
     },
   },
+  {
+    name: 'browser_reset_profile',
+    description:
+      'Destructively reset the persistent Chromium profile directory. Closes the browser and recursively deletes the profile (cookies, localStorage, auth, cache). Use when the profile is in a bad state. Requires confirm=true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        confirm: { type: 'boolean', description: 'Must be true to proceed' },
+      },
+      required: ['confirm'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
@@ -615,18 +630,24 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
       case 'browser_console': {
         await browser.getPage();
-        let entries = browser.consoleLog;
+        let entries = a.all_tabs ? browser.getAllConsoleLogs() : browser.consoleLog;
         if (a.errors_only) entries = entries.filter((e) => e.type === 'error' || e.type === 'warning');
-        const out = entries.map((e) => `[${e.type}] ${e.text}${e.location ? ` (${e.location})` : ''}`).join('\n');
+        const out = entries.map((e) => {
+          const prefix = a.all_tabs ? `[tab ${e.tabIndex ?? '?'}] ` : '';
+          return `${prefix}[${e.type}] ${e.text}${e.location ? ` (${e.location})` : ''}`;
+        }).join('\n');
         if (a.clear) browser.clearConsole();
         return text(out || '(no console messages)');
       }
 
       case 'browser_network': {
         await browser.getPage();
-        let entries = browser.networkLog;
+        let entries = a.all_tabs ? browser.getAllNetworkLogs() : browser.networkLog;
         if (a.failed_only) entries = entries.filter((e) => e.status === undefined || (e.status && e.status >= 400));
-        const out = entries.map((e) => `${e.method} ${e.status ?? 'pending'} ${e.url}`).join('\n');
+        const out = entries.map((e) => {
+          const prefix = a.all_tabs ? `[tab ${e.tabIndex ?? '?'}] ` : '';
+          return `${prefix}${e.method} ${e.status ?? 'pending'} ${e.url}`;
+        }).join('\n');
         if (a.clear) browser.clearNetwork();
         return text(out || '(no network activity)');
       }
@@ -932,6 +953,21 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         browser.setActivePage(target);
         await target.bringToFront().catch(() => {});
         return text(`Switched to tab ${idx}: ${target.url()}`);
+      }
+
+      case 'browser_reset_profile': {
+        if (a.confirm !== true) {
+          return text(
+            'browser_reset_profile destructively deletes the persistent Chromium profile ' +
+            `(at ${DEFAULT_DATA_DIR}), clearing all cookies, localStorage, saved auth, and cache. ` +
+            'This cannot be undone. Re-call with confirm: true to proceed.',
+            true
+          );
+        }
+        await browser.close();
+        const path = browser.getDataDir();
+        await rm(path, { recursive: true, force: true });
+        return text(`Profile reset. Removed: ${path}`);
       }
 
       default:
