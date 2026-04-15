@@ -408,6 +408,7 @@ const tools = [
         text_pattern: { type: 'string', description: 'Case-insensitive substring to match link text' },
         same_origin_only: { type: 'boolean', description: 'Drop external links (default false)' },
         max: { type: 'number', description: 'Cap result count (default 200)' },
+        include_unlabeled: { type: 'boolean', description: 'Include anchors with no discoverable label (fallback to a slug derived from the href path). Default false — unlabeled anchors are skipped.' },
       },
     },
   },
@@ -598,7 +599,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
       case 'browser_screenshot_annotated': {
         const page = await browser.getPage();
-        await snapshot(page, {}); // ensure refs are tagged
+        // Tag interactive elements with data-browse-ref. interactive:true is
+        // much faster than the full-tree walk and is all annotate needs.
+        await snapshot(page, { interactive: true });
+        // Brief settling moment for any refs that affect layout (e.g. focus rings).
+        await page.waitForTimeout(100);
         const buf = await annotatedScreenshot(page);
         return image(buf);
       }
@@ -877,6 +882,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           textPattern: a.text_pattern,
           sameOriginOnly: !!a.same_origin_only,
           max: typeof a.max === 'number' ? a.max : 200,
+          includeUnlabeled: !!a.include_unlabeled,
         });
         return text(JSON.stringify(links, null, 2));
       }
