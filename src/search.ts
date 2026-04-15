@@ -1,11 +1,35 @@
 // DuckDuckGo HTML-endpoint search. No JS, no API key, no browser launch.
 // Endpoint returns server-rendered HTML we can regex-parse for top results.
+//
+// FRAGILITY NOTICE
+// ----------------
+// None of the endpoints used here are official / documented APIs:
+//   - https://html.duckduckgo.com/html/        (DDG HTML SERP)
+//   - https://duckduckgo.com/i.js              (DDG images JSON, needs vqd token)
+//   - https://duckduckgo.com/news.js           (DDG news JSON, needs vqd token)
+//   - https://www.bing.com/search              (Bing b_algo HTML SERP fallback)
+//
+// The selectors / JSON shapes below are "last verified" as of 2026-04-15.
+// When a provider changes layout, the parsers will quietly return zero
+// results. We mitigate that by:
+//   (1) logging a structured "parse returned 0" telemetry event to
+//       ~/.browse-mcp/issues.jsonl (via logIssue) so CI / the agent can
+//       notice silent breakage on `browser_review_issues`.
+//   (2) falling back DDG -> Bing on empty / failure.
+//   (3) offering an opt-in Brave Search API path via the
+//       BROWSE_MCP_BRAVE_API_KEY env var. When set, Brave is tried first
+//       for browser_search and used as a last-resort fallback for
+//       browser_search_news. No key == current behavior.
+//   (4) raising informative errors that mention the likely cause
+//       (provider layout change) rather than a bare "no results".
+
+import { logIssue } from './issues.js';
 
 export interface SearchResult {
   title: string;
   url: string;
   snippet: string;
-  engine?: 'ddg' | 'bing';
+  engine?: 'ddg' | 'bing' | 'brave';
 }
 
 export interface NewsResult {
@@ -31,11 +55,39 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36';
 
+// Parser version stamps. Bump when the upstream layout changes and we
+// adjust selectors, so review-issues log entries are attributable.
+const DDG_HTML_PARSER_VERSION = '2026-04-15';
+const BING_HTML_PARSER_VERSION = '2026-04-15';
+const DDG_NEWS_PARSER_VERSION = '2026-04-15';
+const DDG_IMAGES_PARSER_VERSION = '2026-04-15';
+
+function braveKey(): string | undefined {
+  const k = process.env.BROWSE_MCP_BRAVE_API_KEY;
+  return k && k.trim() ? k.trim() : undefined;
+}
+
 export async function duckDuckGoSearch(
   query: string,
   maxResults = 10,
   region?: string
 ): Promise<SearchResult[]> {
+  // Opt-in: Brave Search API first when a key is configured. Falls through
+  // to DDG/Bing scrape on any Brave failure.
+  const key = braveKey();
+  if (key) {
+    try {
+      const r = await braveSearch(query, maxResults, key);
+      if (r.length > 0) return r;
+    } catch (err) {
+      await logIssue({
+        kind: 'error',
+        tool: 'browser_search',
+        error: `Brave API failed, falling back to DDG: ${(err as Error).message}`,
+      });
+    }
+  }
+
   try {
     const body = new URLSearchParams({ q: query });
     if (region) body.set('kl', region);
@@ -55,17 +107,32 @@ export async function duckDuckGoSearch(
     const html = await res.text();
     const results = parseResults(html, maxResults).map((r) => ({ ...r, engine: 'ddg' as const }));
     if (results.length === 0) {
-      // DDG returned no parseable results (e.g. anti-bot interstitial); try Bing.
+      // DDG returned no parseable results (anti-bot interstitial or layout change).
+      await logIssue({
+        kind: 'difficulty',
+        tool: 'browser_search',
+        note: `DDG HTML parser ${DDG_HTML_PARSER_VERSION} returned 0 results — endpoint layout may have changed or bot-detection triggered`,
+        context: { htmlLen: html.length, query },
+      });
       return await bingSearch(query, maxResults);
     }
     return results;
   } catch (err) {
     // HTTP failure or parse crash — try Bing as a fallback.
     try {
-      return await bingSearch(query, maxResults);
-    } catch {
-      // Re-throw the original DDG error if Bing also fails.
-      throw err;
+      const bing = await bingSearch(query, maxResults);
+      if (bing.length > 0) return bing;
+      throw new Error(`Both DDG and Bing returned 0 results. The scraped HTML layouts may have changed. ` +
+        `Original DDG error: ${(err as Error).message}. ` +
+        `Set BROWSE_MCP_BRAVE_API_KEY for a supported API-based fallback.`);
+    } catch (bingErr) {
+      // Re-throw a combined error so the agent sees both causes.
+      throw new Error(
+        `Search failed on all providers. DDG: ${(err as Error).message}; ` +
+        `Bing: ${(bingErr as Error).message}. ` +
+        `These providers use unofficial HTML endpoints and may have changed layout. ` +
+        `Set BROWSE_MCP_BRAVE_API_KEY for a supported API-based fallback.`
+      );
     }
   }
 }
@@ -78,43 +145,60 @@ export async function duckDuckGoNewsSearch(
   // The html.duckduckgo.com endpoint does not return timestamped news blocks
   // (same result__* layout, no dates), so use the JSON news.js endpoint which
   // returns proper news items with `relative_time`, `source`, and `excerpt`.
-  const vqd = await getVqd(query);
-  const kl = region || 'us-en';
-  const u = new URL('https://duckduckgo.com/news.js');
-  u.searchParams.set('l', kl);
-  u.searchParams.set('o', 'json');
-  u.searchParams.set('q', query);
-  u.searchParams.set('noamp', '1');
-  u.searchParams.set('vqd', vqd);
-  const res = await fetch(u.toString(), {
-    headers: {
-      'User-Agent': UA,
-      'Accept': 'application/json, text/javascript, */*; q=0.01',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Referer': 'https://duckduckgo.com/',
-      'X-Requested-With': 'XMLHttpRequest',
-    },
-  });
-  if (!res.ok) throw new Error(`DuckDuckGo news HTTP ${res.status}`);
-  const text = await res.text();
-  let data: any;
+  // Parser version: see DDG_NEWS_PARSER_VERSION above.
   try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(`DuckDuckGo news: non-JSON response (len=${text.length})`);
-  }
-  const out: NewsResult[] = [];
-  for (const r of data.results || []) {
-    if (out.length >= maxResults) break;
-    out.push({
-      title: stripTags(String(r.title || '')).trim(),
-      url: String(r.url || ''),
-      snippet: stripTags(String(r.excerpt || '')).trim(),
-      source: r.source ? String(r.source) : undefined,
-      date: r.relative_time ? String(r.relative_time) : undefined,
+    const vqd = await getVqd(query);
+    const kl = region || 'us-en';
+    const u = new URL('https://duckduckgo.com/news.js');
+    u.searchParams.set('l', kl);
+    u.searchParams.set('o', 'json');
+    u.searchParams.set('q', query);
+    u.searchParams.set('noamp', '1');
+    u.searchParams.set('vqd', vqd);
+    const res = await fetch(u.toString(), {
+      headers: {
+        'User-Agent': UA,
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://duckduckgo.com/',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
     });
+    if (!res.ok) throw new Error(`DuckDuckGo news HTTP ${res.status}`);
+    const text = await res.text();
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`DuckDuckGo news: non-JSON response (len=${text.length}) — endpoint layout may have changed`);
+    }
+    const out: NewsResult[] = [];
+    for (const r of data.results || []) {
+      if (out.length >= maxResults) break;
+      out.push({
+        title: stripTags(String(r.title || '')).trim(),
+        url: String(r.url || ''),
+        snippet: stripTags(String(r.excerpt || '')).trim(),
+        source: r.source ? String(r.source) : undefined,
+        date: r.relative_time ? String(r.relative_time) : undefined,
+      });
+    }
+    if (out.length === 0) {
+      await logIssue({
+        kind: 'difficulty',
+        tool: 'browser_search_news',
+        note: `DDG news parser ${DDG_NEWS_PARSER_VERSION} returned 0 results — JSON shape may have changed`,
+        context: { rawResults: Array.isArray(data.results) ? data.results.length : 'missing', query },
+      });
+    }
+    return out;
+  } catch (err) {
+    throw new Error(
+      `News search failed: ${(err as Error).message}. ` +
+      `This uses an unofficial DDG JSON endpoint that can break when the site changes. ` +
+      `No stable free news-API fallback is wired in; consider browser_search with the query + "news".`
+    );
   }
-  return out;
 }
 
 export async function duckDuckGoImageSearch(
@@ -122,43 +206,93 @@ export async function duckDuckGoImageSearch(
   maxResults = 20,
   safeSearch: 'strict' | 'moderate' | 'off' = 'moderate'
 ): Promise<ImageResult[]> {
-  const vqd = await getVqd(query);
-  const p = safeSearch === 'strict' ? '1' : safeSearch === 'off' ? '-1' : '0';
-  const u = new URL('https://duckduckgo.com/i.js');
-  u.searchParams.set('l', 'us-en');
-  u.searchParams.set('o', 'json');
+  // Parser version: see DDG_IMAGES_PARSER_VERSION above.
+  try {
+    const vqd = await getVqd(query);
+    const p = safeSearch === 'strict' ? '1' : safeSearch === 'off' ? '-1' : '0';
+    const u = new URL('https://duckduckgo.com/i.js');
+    u.searchParams.set('l', 'us-en');
+    u.searchParams.set('o', 'json');
+    u.searchParams.set('q', query);
+    u.searchParams.set('p', p);
+    u.searchParams.set('v7exp', 'a');
+    u.searchParams.set('vqd', vqd);
+    const res = await fetch(u.toString(), {
+      headers: {
+        'User-Agent': UA,
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://duckduckgo.com/',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+    if (!res.ok) throw new Error(`DuckDuckGo images HTTP ${res.status}`);
+    const text = await res.text();
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`DuckDuckGo images: non-JSON response (len=${text.length}) — endpoint layout may have changed`);
+    }
+    const out: ImageResult[] = [];
+    for (const r of data.results || []) {
+      if (out.length >= maxResults) break;
+      out.push({
+        title: decodeEntities(String(r.title || '')),
+        image: String(r.image || ''),
+        thumbnail: String(r.thumbnail || ''),
+        url: String(r.url || ''),
+        width: Number(r.width || 0),
+        height: Number(r.height || 0),
+        source: String(r.source || ''),
+      });
+    }
+    if (out.length === 0) {
+      await logIssue({
+        kind: 'difficulty',
+        tool: 'browser_search_images',
+        note: `DDG images parser ${DDG_IMAGES_PARSER_VERSION} returned 0 results — JSON shape may have changed`,
+        context: { rawResults: Array.isArray(data.results) ? data.results.length : 'missing', query },
+      });
+    }
+    return out;
+  } catch (err) {
+    throw new Error(
+      `Image search failed: ${(err as Error).message}. ` +
+      `This uses an unofficial DDG JSON endpoint (needs a vqd token) that can break when the site changes.`
+    );
+  }
+}
+
+// --- Brave Search API (opt-in) ----------------------------------------------
+// Free tier: 1 req/s, 2000/mo. Docs: https://api.search.brave.com/app/documentation
+// Triggered only when BROWSE_MCP_BRAVE_API_KEY is set.
+
+async function braveSearch(query: string, maxResults: number, key: string): Promise<SearchResult[]> {
+  const u = new URL('https://api.search.brave.com/res/v1/web/search');
   u.searchParams.set('q', query);
-  u.searchParams.set('p', p);
-  u.searchParams.set('v7exp', 'a');
-  u.searchParams.set('vqd', vqd);
+  u.searchParams.set('count', String(Math.min(maxResults, 20)));
   const res = await fetch(u.toString(), {
     headers: {
-      'User-Agent': UA,
-      'Accept': 'application/json, text/javascript, */*; q=0.01',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Referer': 'https://duckduckgo.com/',
-      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json',
+      'Accept-Encoding': 'gzip',
+      'X-Subscription-Token': key,
     },
   });
-  if (!res.ok) throw new Error(`DuckDuckGo images HTTP ${res.status}`);
-  const text = await res.text();
-  let data: any;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(`DuckDuckGo images: non-JSON response (len=${text.length})`);
-  }
-  const out: ImageResult[] = [];
-  for (const r of data.results || []) {
+  if (!res.ok) throw new Error(`Brave API HTTP ${res.status}`);
+  const data: any = await res.json();
+  const items: any[] = data?.web?.results || [];
+  const out: SearchResult[] = [];
+  for (const r of items) {
     if (out.length >= maxResults) break;
+    const title = stripTags(String(r.title || '')).trim();
+    const url = String(r.url || '');
+    if (!title || !url) continue;
     out.push({
-      title: decodeEntities(String(r.title || '')),
-      image: String(r.image || ''),
-      thumbnail: String(r.thumbnail || ''),
-      url: String(r.url || ''),
-      width: Number(r.width || 0),
-      height: Number(r.height || 0),
-      source: String(r.source || ''),
+      title,
+      url,
+      snippet: stripTags(String(r.description || '')).trim(),
+      engine: 'brave',
     });
   }
   return out;
@@ -198,7 +332,16 @@ async function bingSearch(query: string, maxResults: number): Promise<SearchResu
   });
   if (!res.ok) throw new Error(`Bing HTTP ${res.status}`);
   const html = await res.text();
-  return parseBingResults(html, maxResults);
+  const results = parseBingResults(html, maxResults);
+  if (results.length === 0) {
+    await logIssue({
+      kind: 'difficulty',
+      tool: 'browser_search',
+      note: `Bing HTML parser ${BING_HTML_PARSER_VERSION} returned 0 results — b_algo selector may have changed or bot-detection triggered`,
+      context: { htmlLen: html.length, query },
+    });
+  }
+  return results;
 }
 
 function parseBingResults(html: string, max: number): SearchResult[] {
