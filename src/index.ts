@@ -525,7 +525,31 @@ const tools = [
   },
 ];
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
+// BROWSE_MCP_TOOLS env filter: comma-separated list of tool names OR named
+// bundles (core, search, content, visual, debug, edit, session). Lets users
+// cut the ~5K-token schema payload when their MCP client loads everything
+// up front. Default: expose all tools.
+const TOOL_BUNDLES: Record<string, string[]> = {
+  core: ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type', 'browser_press_key', 'browser_wait_for', 'browser_eval', 'browser_close'],
+  search: ['browser_search', 'browser_search_news', 'browser_search_images', 'browser_research'],
+  content: ['browser_read', 'browser_links', 'browser_extract_listings'],
+  visual: ['browser_screenshot', 'browser_screenshot_annotated', 'browser_responsive'],
+  debug: ['browser_console', 'browser_network', 'browser_a11y_audit', 'browser_inspect_css', 'browser_report_difficulty', 'browser_review_issues'],
+  edit: ['browser_modify_style', 'browser_undo_style', 'browser_cleanup'],
+  session: ['browser_tabs', 'browser_switch_tab', 'browser_handoff', 'browser_resume', 'browser_download', 'browser_reset_profile', 'browser_hover', 'browser_scroll', 'browser_find_text', 'browser_wait_for_text'],
+};
+function filterTools(all: typeof tools): typeof tools {
+  const raw = process.env.BROWSE_MCP_TOOLS;
+  if (!raw) return all;
+  const allowed = new Set<string>();
+  for (const tok of raw.split(',').map((s) => s.trim()).filter(Boolean)) {
+    if (TOOL_BUNDLES[tok]) for (const n of TOOL_BUNDLES[tok]) allowed.add(n);
+    else allowed.add(tok);
+  }
+  return all.filter((t) => allowed.has(t.name));
+}
+const exposedTools = filterTools(tools);
+server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: exposedTools }));
 
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args = {} } = req.params;

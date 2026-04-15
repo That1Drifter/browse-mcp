@@ -1,12 +1,39 @@
 # browse-mcp
 
-A headless-browser MCP server for Claude (or any MCP client). Built on Playwright, with a persistent Chromium profile, accessibility-tree snapshots with `@eN`/`@cN` refs, Readability-based article extraction, search without an API key, and a self-improvement loop that logs tool friction back for later review.
+[![build](https://github.com/That1Drifter/browse-mcp/actions/workflows/build.yml/badge.svg)](https://github.com/That1Drifter/browse-mcp/actions/workflows/build.yml)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](https://nodejs.org)
 
-37 tools across navigation, snapshotting, interaction, search, content extraction, multi-tab, a11y, CSS inspection, and visual diffing.
+A headless-browser MCP server for Claude (or any MCP client). Playwright-based, with accessibility-tree refs, Readability article extraction, search without an API key, a research macro that bundles search-and-read into one call, annotated screenshots, and a self-improvement feedback loop.
+
+## Why another browser MCP?
+
+Microsoft's [playwright-mcp](https://github.com/microsoft/playwright-mcp) is excellent for test-style automation — it assumes you know what you want to do and drives the browser deterministically. browse-mcp is built for the opposite shape of task: **reading, researching, and scraping real-world pages from a conversational agent**, where the agent doesn't know the page structure in advance.
+
+The differentiators:
+
+- **`browser_research`** — single call: search → visit top N results → run Readability on each → return concatenated Markdown. Replaces a 10-roundtrip workflow.
+- **`browser_read`** — Readability extraction for clean article text (no scripts, nav, ads, chrome).
+- **`browser_search` / `_news` / `_images`** — DuckDuckGo + Bing fallback, no API key, no browser launch per query.
+- **Accessibility-tree snapshots with `@eN` refs** — interactive-only by default, collapses single-child wrappers, pierces shadow DOM and iframes. Far more compact than a full DOM dump.
+- **Self-improvement loop** — every tool error auto-logs to `~/.browse-mcp/issues.jsonl`. `browser_report_difficulty` lets the agent flag subtler friction. `browser_review_issues` surfaces known rough edges at session start.
+- **Persistent profile** — OAuth/MFA/CAPTCHA solves survive across sessions.
+
+If you need strict test-style automation and multiple isolated contexts, reach for playwright-mcp. If you're building an agent that needs to read and research the live web, reach for this.
 
 ## Install
 
-Requires Node.js 18+ and Git.
+Requires Node.js ≥ 18.
+
+**Option A — `npx` (no clone):**
+
+```bash
+npx browse-mcp
+```
+
+(Playwright-bundled Chromium will download on first launch.)
+
+**Option B — from source:**
 
 ```bash
 git clone https://github.com/That1Drifter/browse-mcp.git
@@ -19,30 +46,40 @@ npm run build
 ## Register with Claude Code
 
 ```bash
+claude mcp add browse -- npx -y browse-mcp
+```
+
+Or, for a local checkout:
+
+```bash
 claude mcp add browse -- node /absolute/path/to/browse-mcp/dist/index.js
 ```
 
-Or edit `~/.claude.json` directly:
+## Schema budget
 
-```json
-{
-  "mcpServers": {
-    "browse": {
-      "command": "node",
-      "args": ["/absolute/path/to/browse-mcp/dist/index.js"]
-    }
-  }
-}
+All 37 tools exposed at once is roughly **4.9K tokens / 19.5 KB** of schema — about 5% of a 100K context window, before any actual work.
+
+Clients that support **lazy tool loading** (Claude Code's `ToolSearch` does) don't pay this up front. For clients that don't, restrict the exposed list via the `BROWSE_MCP_TOOLS` env var:
+
+```bash
+# Named bundles (union of tools):
+BROWSE_MCP_TOOLS=core,search,content
+
+# Or specific tools:
+BROWSE_MCP_TOOLS=browser_navigate,browser_snapshot,browser_read,browser_search
+
+# Or mix:
+BROWSE_MCP_TOOLS=core,browser_research
 ```
 
-Windows paths work too — use escaped backslashes (`"C:\\path\\to\\dist\\index.js"`) in JSON.
+Bundles: `core` (nav/snapshot/click/type/eval/wait/close, 8 tools), `search` (4), `content` (3), `visual` (3), `debug` (6), `edit` (3), `session` (10). Omit the var to expose everything.
 
 ## Tools
 
 ### Navigation & interaction
 | Tool | What it does |
 |---|---|
-| `browser_navigate` | Go to a URL. Auto-routes `.pdf` and `Download is starting` responses to `browser_download`. Suggests `browser_handoff` on captcha/Cloudflare interstitials. |
+| `browser_navigate` | Go to a URL. Auto-routes `.pdf` and `Download is starting` to `browser_download`. Suggests `browser_handoff` on captcha/Cloudflare interstitials. |
 | `browser_click` | Click a `@ref` or CSS selector |
 | `browser_type` | Fill an input; optional `press_enter` |
 | `browser_press_key` | Press any keyboard key |
@@ -55,70 +92,70 @@ Windows paths work too — use escaped backslashes (`"C:\\path\\to\\dist\\index.
 ### Snapshot & content
 | Tool | What it does |
 |---|---|
-| `browser_snapshot` | Accessibility tree with `@eN` (interactive) / `@cN` (cursor-pointer) refs. Args: `selector` (scope), `clean` (strip ads/banners first), `no_collapse` (don't collapse single-child chains), `diff`, `max_lines`, `max_depth` |
-| `browser_read` | Main-article extraction via Mozilla Readability — returns clean Markdown. `format`: `markdown`/`text`/`json` |
-| `browser_links` | Enumerate anchors — `{text, href, ref}`. Filter by `href_pattern` (substring or `/regex/flags`), `text_pattern`, `same_origin_only`. Default skips unlabeled anchors; `include_unlabeled` opt-in with slug fallback |
-| `browser_extract_listings` | Structured listing scrape. `group_by`: `href` (marketplace cards), `row` (HN/Reddit/blog), or `auto`. Parses year/price/distance/location/new/used/image |
+| `browser_snapshot` | Accessibility tree with `@eN` (interactive) / `@cN` (cursor-pointer) refs. Args: `selector`, `clean`, `no_collapse`, `diff`, `max_lines`, `max_depth` |
+| `browser_read` | Mozilla Readability → clean Markdown. `format`: `markdown` / `text` / `json` |
+| `browser_links` | Enumerate anchors — `{text, href, ref}`. Filter by `href_pattern` (substring or `/regex/flags`), `text_pattern`, `same_origin_only`. Default skips unlabeled; `include_unlabeled` opt-in with slug fallback |
+| `browser_extract_listings` | Structured listing scrape. `group_by`: `href` (marketplace), `row` (HN/Reddit/blog), `auto`. Parses year/price/distance/location/new/used/image |
 
 ### Search & research
 | Tool | What it does |
 |---|---|
-| `browser_search` | Web search via DuckDuckGo HTML endpoint — no API key, no browser launch. Auto-falls back to Bing if DDG returns nothing |
-| `browser_search_news` | News search with relative timestamps and source |
+| `browser_search` | Web search via DuckDuckGo HTML endpoint. No API key, no browser. Falls back to Bing if DDG returns nothing |
+| `browser_search_news` | News search with timestamps and source |
 | `browser_search_images` | Image search — title/image/thumbnail/dimensions/source |
-| `browser_research` | High-level macro: search → read top N → concatenated Markdown with source headers. The biggest token-saver on a research task |
+| `browser_research` | **Macro:** search → read top N → concatenated Markdown. One call. |
 
 ### Screenshots & visual
 | Tool | What it does |
 |---|---|
 | `browser_screenshot` | PNG of page or element (`full_page`, `selector`) |
-| `browser_screenshot_annotated` | PNG with red overlay boxes + `@ref` labels. Auto-runs `browser_snapshot` first so refs are always tagged |
-| `browser_responsive` | One call → mobile (375×812), tablet (768×1024), desktop (1280×720) screenshots |
+| `browser_screenshot_annotated` | PNG with red overlay boxes + `@ref` labels. Auto-runs snapshot first |
+| `browser_responsive` | Mobile (375×812) + tablet (768×1024) + desktop (1280×720) in one call |
 
 ### Debugging & inspection
 | Tool | What it does |
 |---|---|
 | `browser_eval` | Run a JS expression in page context |
-| `browser_console` | Captured console messages. Per-tab by default; `all_tabs: true` for combined. `errors_only`, `clear` |
+| `browser_console` | Captured console messages. Per-tab by default; `all_tabs: true` for combined |
 | `browser_network` | Captured network log. Same per-tab model. `failed_only`, `clear` |
-| `browser_a11y_audit` | axe-core WCAG scan with violation details |
-| `browser_inspect_css` | Chrome DevTools Protocol cascade for one element. Shorthand/longhand deduplicated |
+| `browser_a11y_audit` | axe-core WCAG scan |
+| `browser_inspect_css` | CDP cascade for one element. Shorthand/longhand deduped |
 
 ### Live editing
 | Tool | What it does |
 |---|---|
-| `browser_modify_style` / `browser_undo_style` | Live CSS edits with an undo stack. Dogfood design changes without rebuilding |
-| `browser_cleanup` | Remove ads, cookie banners, sticky bars, social popups. Flags: `ads`, `cookies`, `sticky`, `social`, `all` |
+| `browser_modify_style` / `browser_undo_style` | Live CSS edits with an undo stack |
+| `browser_cleanup` | Remove ads / cookies / sticky bars / social popups |
 
 ### Multi-tab & session
 | Tool | What it does |
 |---|---|
-| `browser_tabs` / `browser_switch_tab` | List and switch tabs. Subsequent tools act on the chosen tab |
-| `browser_handoff` / `browser_resume` | Hand the current page to a visible Chrome window for CAPTCHA/MFA/OAuth, then return to headless. Persistent profile means auth survives across sessions |
-| `browser_download` | Save attachment-disposition downloads (PDFs, binaries). `force_fetch: true` falls back to raw HTTP for plain files (SVG/JSON/HTML) |
-| `browser_reset_profile` | Nuke the persistent Chromium profile (cookies, localStorage, auth). Requires `confirm: true` |
+| `browser_tabs` / `browser_switch_tab` | List and switch tabs |
+| `browser_handoff` / `browser_resume` | Hand current page to a visible Chrome for CAPTCHA/MFA, then back to headless. Persistent profile — auth survives sessions |
+| `browser_download` | Save attachment downloads. `force_fetch: true` falls back to raw HTTP for plain files |
+| `browser_reset_profile` | Nuke the persistent Chromium profile. Requires `confirm: true` |
 
 ### Self-improvement loop
 | Tool | What it does |
 |---|---|
-| `browser_report_difficulty` | Claude logs friction or missing features. Written to `~/.browse-mcp/issues.jsonl` |
-| `browser_review_issues` | Read back auto-logged errors + reported difficulties. Useful at session start to surface known rough edges |
+| `browser_report_difficulty` | Claude logs friction or missing features to `~/.browse-mcp/issues.jsonl` |
+| `browser_review_issues` | Read back auto-logged errors + reported difficulties |
 
 ## Self-improvement loop
 
-Every tool error is auto-logged to `~/.browse-mcp/issues.jsonl` along with the tool name, arguments, message, and current URL. Claude is prompted (via the `browser_report_difficulty` description) to log subtler friction proactively — ref mismatches, noisy snapshots, retries, missing capabilities.
+Every tool error is auto-logged to `~/.browse-mcp/issues.jsonl` with the tool name, arguments, message, and current URL. Claude is prompted (via the `browser_report_difficulty` description) to log subtler friction — ref mismatches, noisy snapshots, retries, missing capabilities — even when no error fired.
 
-At the start of a session, Claude can run `browser_review_issues` to see known rough edges. Hand the log to a coding agent later to drive the next round of improvements.
+At session start, an agent can run `browser_review_issues` to see known rough edges. Hand the log to a coding agent later to drive the next round of improvements.
 
 Override the data dir with `BROWSE_MCP_HOME`.
 
 ## Design notes
 
 - **Persistent profile**: `~/.browse-mcp/chromium-profile/`. OAuth, MFA, cookies, and CAPTCHA solves survive across sessions.
-- **Soft stealth**: strips the `navigator.webdriver` tell on every page, keeps a realistic UA. Doesn't fight hard-core anti-bot like DDG.
+- **Soft stealth**: strips the `navigator.webdriver` tell and sets a realistic UA. Does not fight serious anti-bot systems. When blocked, `browser_navigate` suggests `browser_handoff` so a human can solve the challenge.
 - **Refs pierce shadow DOM** and traverse iframes. Refs from iframe N look like `@fNeM`.
-- **Search via DDG HTML endpoint + Bing fallback** avoids bot-detection interstitials that the JS-rendered search engines serve to headless browsers.
-- **Readability is fetched from unpkg at runtime** on first `browser_read` call and cached in module scope — no npm dep, no build step.
+- **Search via DDG HTML endpoint + Bing fallback** sidesteps the bot-detection pages the JS-rendered SERPs serve to headless browsers.
+- **Readability is fetched from unpkg at runtime** on first `browser_read` call and cached in module scope — no npm dep, no extra build step.
 
 ## License & attribution
 

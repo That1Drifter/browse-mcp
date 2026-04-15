@@ -1,6 +1,6 @@
 {
   "name": "browse-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Headless-browser MCP server for Claude — Playwright-based, with accessibility-tree refs, Readability, search, annotated screenshots, and a self-improvement feedback loop.",
   "license": "MIT",
   "author": "Roger Maxwell (That1Drifter) <americanemt@gmail.com>",
