@@ -18,6 +18,8 @@ import { findByText, waitForText } from './finder.js';
 import { downloadUrl } from './download.js';
 import { extractListings } from './listings.js';
 import { duckDuckGoSearch, formatResults } from './search.js';
+import { readArticle, formatArticle } from './read.js';
+import { collectLinks } from './links.js';
 
 const server = new Server(
   { name: 'browse-mcp', version: '0.1.0' },
@@ -369,6 +371,36 @@ const tools = [
         json: { type: 'boolean', description: 'Return raw JSON array instead of formatted text' },
       },
       required: ['query'],
+    },
+  },
+  {
+    name: 'browser_read',
+    description:
+      'Extract the main article content of the current page (or a URL) as clean Markdown using Mozilla Readability. Strips nav, ads, and chrome. Great for reading long-form articles without the noise of a full snapshot. Returns friendly error if no article was detected — fall back to browser_snapshot in that case.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Optional URL to navigate to first (waitUntil domcontentloaded)' },
+        format: {
+          type: 'string',
+          enum: ['markdown', 'text', 'json'],
+          description: 'Output format (default: markdown). "text" = textContent only, "json" = raw parsed object.',
+        },
+      },
+    },
+  },
+  {
+    name: 'browser_links',
+    description:
+      'Enumerate every anchor on the current page as a JSON array of {text, href, ref}. Pierces shadow DOM and traverses same-origin iframes. Refs are included only for anchors currently tagged by a recent snapshot. Use href_pattern (substring or /regex/flags) and text_pattern (case-insensitive substring) to filter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        href_pattern: { type: 'string', description: 'Substring or /regex/flags literal to match href' },
+        text_pattern: { type: 'string', description: 'Case-insensitive substring to match link text' },
+        same_origin_only: { type: 'boolean', description: 'Drop external links (default false)' },
+        max: { type: 'number', description: 'Cap result count (default 200)' },
+      },
     },
   },
   {
@@ -725,6 +757,30 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           return `${head}\n${body}`;
         });
         return text(lines.join('\n\n') + `\n\n(source: ${logPath()})`);
+      }
+
+      case 'browser_read': {
+        const page = await browser.getPage();
+        const format = (a.format as 'markdown' | 'text' | 'json') || 'markdown';
+        const article = await readArticle(page, { url: a.url, format });
+        if (!article || (!article.content && !article.textContent)) {
+          return text(
+            'Readability did not detect an article on this page. Fall back to browser_snapshot for a general accessibility tree.',
+            true
+          );
+        }
+        return text(formatArticle(article, format));
+      }
+
+      case 'browser_links': {
+        const page = await browser.getPage();
+        const links = await collectLinks(page, {
+          hrefPattern: a.href_pattern,
+          textPattern: a.text_pattern,
+          sameOriginOnly: !!a.same_origin_only,
+          max: typeof a.max === 'number' ? a.max : 200,
+        });
+        return text(JSON.stringify(links, null, 2));
       }
 
       default:
