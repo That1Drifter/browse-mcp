@@ -1004,6 +1004,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       }
 
       case 'browser_reset_profile': {
+        if (browser.isEphemeral()) {
+          await browser.close();
+          return text('Ephemeral mode (BROWSE_MCP_EPHEMERAL=1): no persistent profile to delete. Browser closed; next call starts a fresh context.');
+        }
         if (a.confirm !== true) {
           return text(
             'browser_reset_profile destructively deletes the persistent Chromium profile ' +

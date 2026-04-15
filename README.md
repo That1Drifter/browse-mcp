@@ -193,7 +193,7 @@ Override the data dir with `BROWSE_MCP_HOME`.
 
 ## Design notes
 
-- **Persistent profile**: `~/.browse-mcp/chromium-profile/`. OAuth, MFA, cookies, and CAPTCHA solves survive across sessions.
+- **Persistent profile**: `~/.browse-mcp/chromium-profile/`. OAuth, MFA, cookies, and CAPTCHA solves survive across sessions. This is convenient but has security trade-offs — see [SECURITY.md](SECURITY.md). Set `BROWSE_MCP_EPHEMERAL=1` for an in-memory-only profile, or use `browser_reset_profile` to wipe.
 - **Soft stealth**: strips the `navigator.webdriver` tell and sets a realistic UA. Does not fight serious anti-bot systems. When blocked, `browser_navigate` suggests `browser_handoff` so a human can solve the challenge.
 - **Refs pierce shadow DOM** and traverse iframes. Refs from iframe N look like `@fNeM`.
 - **Search via DDG HTML endpoint + Bing fallback** sidesteps the bot-detection pages the JS-rendered SERPs serve to headless browsers.
