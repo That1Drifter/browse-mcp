@@ -52,9 +52,10 @@ const tools = [
         interactive: { type: 'boolean', description: 'Deprecated — interactive is now default. Ignored when full=true.' },
         cursor_interactive: { type: 'boolean', description: 'Also include @c refs for non-ARIA clickables (div/span with cursor:pointer). Useful for React apps that skip semantic HTML.' },
         max_depth: { type: 'number', description: 'Max tree depth' },
-        selector: { type: 'string', description: 'CSS selector to scope the tree (not yet enforced; reserved)' },
+        selector: { type: 'string', description: 'CSS selector to scope the tree to the subtree rooted at the first match' },
         max_lines: { type: 'number', description: 'Truncate output at N lines (default 500)' },
         diff: { type: 'boolean', description: 'Return diff vs previous snapshot' },
+        clean: { type: 'boolean', description: 'Run cleanup (all categories: ads, cookie banners, sticky bars, social popups) before snapshotting' },
       },
     },
   },
@@ -407,6 +408,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const page = await browser.getPage();
         const interactiveOnly = a.full ? false : (a.interactive !== false);
         const maxLines = typeof a.max_lines === 'number' ? a.max_lines : 500;
+        if (a.clean) {
+          await cleanup(page, { all: true });
+        }
         let tree = await snapshot(page, {
           interactive: interactiveOnly,
           maxDepth: a.max_depth,
