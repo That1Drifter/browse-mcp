@@ -36,8 +36,8 @@ const PAGE_FN = `(framePrefix, scopeSelector) => {
   const NOISE_NAME_TAGS = new Set(['SCRIPT','STYLE','NOSCRIPT','TEMPLATE','LINK']);
   const looksLikeCode = (s) => {
     if (!s) return false;
-    if (s.length > 200 && /[{};=]/.test(s) && !/\s[A-Za-z]{3,}\s[A-Za-z]{3,}/.test(s.slice(0, 200))) return true;
-    return /^(\(function|function\s*\(|!function|var\s|let\s|const\s|window\.|document\.|@media|@keyframes|@import|@font-face|body\s*\{|html\s*\{|\.[\w-]+\s*\{|#[\w-]+\s*\{|\/\*)/.test(s);
+    if (s.length > 200 && /[{};=]/.test(s) && !/\\s[A-Za-z]{3,}\\s[A-Za-z]{3,}/.test(s.slice(0, 200))) return true;
+    return /^(\\(function|function\\s*\\(|!function|var\\s|let\\s|const\\s|window\\.|document\\.|@media|@keyframes|@import|@font-face|body\\s*\\{|html\\s*\\{|\\.[\\w-]+\\s*\\{|#[\\w-]+\\s*\\{|\\/\\*)/.test(s);
   };
   // Collect text content skipping script/style/noscript/template descendants.
   const textExcludingNoise = (el, limit) => {
