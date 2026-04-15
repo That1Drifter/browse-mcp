@@ -43,10 +43,7 @@ const COLLECT_FN = `() => {
   return out;
 }`;
 
-export async function annotatedScreenshot(
-  page: Page,
-  opts: AnnotateOptions = {}
-): Promise<Buffer> {
+export async function annotatedScreenshot(page: Page, opts: AnnotateOptions = {}): Promise<Buffer> {
   const color = opts.color || '#ff0044';
   const labelBg = opts.labelBg || '#ff0044';
   const labelFg = opts.labelFg || '#ffffff';
@@ -57,7 +54,10 @@ export async function annotatedScreenshot(
   if (!viewport) throw new Error('No viewport set');
 
   // Collect boxes from main frame (IIFE-wrap so Playwright invokes it)
-  const mainBoxesRaw = (await page.evaluate(`(${COLLECT_FN})()`)) as Array<{ ref: string; x: number; y: number; w: number; h: number }> | undefined | null;
+  const mainBoxesRaw = (await page.evaluate(`(${COLLECT_FN})()`)) as
+    | Array<{ ref: string; x: number; y: number; w: number; h: number }>
+    | undefined
+    | null;
 
   // Defensive: evaluate can return undefined/null on SPAs where the DOM walker bails before main mounts
   const mainBoxes = Array.isArray(mainBoxesRaw) ? mainBoxesRaw : [];
@@ -71,7 +71,10 @@ export async function annotatedScreenshot(
       const box = await frameEl.boundingBox();
       if (!box) continue;
       // Defensive: same guard as main frame — iframe eval can return non-array on SPAs
-      const framedRaw = (await frames[i].evaluate(`(${COLLECT_FN})()`)) as Array<any> | undefined | null;
+      const framedRaw = (await frames[i].evaluate(`(${COLLECT_FN})()`)) as
+        | Array<any>
+        | undefined
+        | null;
       const framed = Array.isArray(framedRaw) ? framedRaw : [];
       for (const b of framed) {
         allBoxes.push({
@@ -100,7 +103,7 @@ export async function annotatedScreenshot(
     parts.push(
       `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="none" stroke="${color}" stroke-width="${stroke}"/>`,
       `<rect x="${b.x}" y="${Math.max(0, b.y - labelH)}" width="${labelW}" height="${labelH}" fill="${labelBg}"/>`,
-      `<text x="${b.x + 3}" y="${Math.max(labelH - 4, b.y - 4)}" font-family="monospace" font-size="${fontSize}" fill="${labelFg}">${escapeXml(labelText)}</text>`
+      `<text x="${b.x + 3}" y="${Math.max(labelH - 4, b.y - 4)}" font-family="monospace" font-size="${fontSize}" fill="${labelFg}">${escapeXml(labelText)}</text>`,
     );
   }
 

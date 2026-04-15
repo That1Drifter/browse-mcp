@@ -12,7 +12,10 @@ export const edit: ToolModule = {
       inputSchema: {
         type: 'object',
         properties: {
-          selector: { type: 'string', description: 'CSS selector (not @ref — applies to all matches)' },
+          selector: {
+            type: 'string',
+            description: 'CSS selector (not @ref — applies to all matches)',
+          },
           property: { type: 'string', description: 'CSS property name (e.g. "background-color")' },
           value: { type: 'string', description: 'CSS value (e.g. "#1a1a1a" or "20px")' },
           important: { type: 'boolean', description: 'Add !important (default false)' },
@@ -22,12 +25,16 @@ export const edit: ToolModule = {
     },
     {
       name: 'browser_undo_style',
-      description: 'Undo the last N style modifications (default 1). Pass count to undo multiple at once.',
+      description:
+        'Undo the last N style modifications (default 1). Pass count to undo multiple at once.',
       inputSchema: {
         type: 'object',
         properties: {
           count: { type: 'number', description: 'How many changes to undo (default 1)' },
-          show_history: { type: 'boolean', description: 'Just list the current undo stack without undoing' },
+          show_history: {
+            type: 'boolean',
+            description: 'Just list the current undo stack without undoing',
+          },
         },
       },
     },
@@ -53,7 +60,7 @@ export const edit: ToolModule = {
       const change = await applyStyle(page, a.selector, a.property, a.value, !!a.important);
       return text(
         `#${change.id} set ${change.property}=${change.newValue}${change.important ? ' !important' : ''} on ${change.matchCount} element(s). ` +
-        `Previous: ${change.previousValue || '(unset)'}. Undo with browser_undo_style.`
+          `Previous: ${change.previousValue || '(unset)'}. Undo with browser_undo_style.`,
       );
     },
 
@@ -62,7 +69,12 @@ export const edit: ToolModule = {
         const h = styleHistory();
         if (h.length === 0) return text('(undo stack empty)');
         return text(
-          h.map((c) => `#${c.id} ${c.selector} { ${c.property}: ${c.newValue}${c.important ? ' !important' : ''}; } (prev: ${c.previousValue || '(unset)'})`).join('\n')
+          h
+            .map(
+              (c) =>
+                `#${c.id} ${c.selector} { ${c.property}: ${c.newValue}${c.important ? ' !important' : ''}; } (prev: ${c.previousValue || '(unset)'})`,
+            )
+            .join('\n'),
         );
       }
       const page = await browser.getPage();

@@ -59,9 +59,10 @@ export const issues: ToolModule = {
       if (slice.length === 0) return text('(no issues logged yet)');
       const lines = slice.map((i) => {
         const head = `[${i.ts}] ${i.kind}${i.tool ? ` ${i.tool}` : ''}`;
-        const body = i.kind === 'error'
-          ? `  error: ${i.error}${i.args ? `\n  args: ${JSON.stringify(i.args)}` : ''}${i.url ? `\n  url: ${i.url}` : ''}`
-          : `  note: ${i.note}${i.context ? `\n  context: ${JSON.stringify(i.context)}` : ''}${i.url ? `\n  url: ${i.url}` : ''}`;
+        const body =
+          i.kind === 'error'
+            ? `  error: ${i.error}${i.args ? `\n  args: ${JSON.stringify(i.args)}` : ''}${i.url ? `\n  url: ${i.url}` : ''}`
+            : `  note: ${i.note}${i.context ? `\n  context: ${JSON.stringify(i.context)}` : ''}${i.url ? `\n  url: ${i.url}` : ''}`;
         return `${head}\n${body}`;
       });
       return text(lines.join('\n\n') + `\n\n(source: ${logPath()})`);

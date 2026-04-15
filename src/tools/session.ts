@@ -49,10 +49,14 @@ export const session: ToolModule = {
         type: 'object',
         properties: {
           url: { type: 'string', description: 'URL to download' },
-          save_dir: { type: 'string', description: 'Optional directory (default: ~/.browse-mcp/downloads)' },
+          save_dir: {
+            type: 'string',
+            description: 'Optional directory (default: ~/.browse-mcp/downloads)',
+          },
           force_fetch: {
             type: 'boolean',
-            description: 'If the page does not trigger a download within ~3s, fall back to a raw fetch() of the URL (default false).',
+            description:
+              'If the page does not trigger a download within ~3s, fall back to a raw fetch() of the URL (default false).',
           },
         },
         required: ['url'],
@@ -82,7 +86,7 @@ export const session: ToolModule = {
           url: p.url(),
           title: await p.title().catch(() => ''),
           active: p === active,
-        }))
+        })),
       );
       return text(JSON.stringify(list, null, 2));
     },
@@ -106,8 +110,8 @@ export const session: ToolModule = {
       await browser.switchMode('headed', url, a.reason || 'handoff');
       return text(
         `Visible Chrome window opened at ${url}. Reason: ${a.reason || '(unspecified)'}. ` +
-        `Cookies/localStorage/auth persist across sessions via the profile at ~/.browse-mcp/chromium-profile/, so OAuth/MFA/CAPTCHA typically only needs to be completed once per service. ` +
-        `Ask the user to complete the task, then call browser_resume.`
+          `Cookies/localStorage/auth persist across sessions via the profile at ~/.browse-mcp/chromium-profile/, so OAuth/MFA/CAPTCHA typically only needs to be completed once per service. ` +
+          `Ask the user to complete the task, then call browser_resume.`,
       );
     },
 
@@ -116,7 +120,9 @@ export const session: ToolModule = {
         try {
           const p = (browser as any).page;
           return p && !p.isClosed() ? p.url() : undefined;
-        } catch { return undefined; }
+        } catch {
+          return undefined;
+        }
       })();
       await browser.switchMode('headless', currentUrl);
       const page = await browser.getPage();
@@ -126,23 +132,28 @@ export const session: ToolModule = {
 
     async browser_download(a) {
       const page = await browser.getPage();
-      const result = await downloadUrl(page, a.url, { saveDir: a.save_dir, forceFetch: !!a.force_fetch });
+      const result = await downloadUrl(page, a.url, {
+        saveDir: a.save_dir,
+        forceFetch: !!a.force_fetch,
+      });
       return text(
-        `Downloaded ${result.filename}\n  path: ${result.path}\n  size: ${result.sizeBytes} bytes\n  from: ${result.url}`
+        `Downloaded ${result.filename}\n  path: ${result.path}\n  size: ${result.sizeBytes} bytes\n  from: ${result.url}`,
       );
     },
 
     async browser_reset_profile(a) {
       if (browser.isEphemeral()) {
         await browser.close();
-        return text('Ephemeral mode (BROWSE_MCP_EPHEMERAL=1): no persistent profile to delete. Browser closed; next call starts a fresh context.');
+        return text(
+          'Ephemeral mode (BROWSE_MCP_EPHEMERAL=1): no persistent profile to delete. Browser closed; next call starts a fresh context.',
+        );
       }
       if (a.confirm !== true) {
         return text(
           'browser_reset_profile destructively deletes the persistent Chromium profile ' +
-          `(at ${DEFAULT_DATA_DIR}), clearing all cookies, localStorage, saved auth, and cache. ` +
-          'This cannot be undone. Re-call with confirm: true to proceed.',
-          true
+            `(at ${DEFAULT_DATA_DIR}), clearing all cookies, localStorage, saved auth, and cache. ` +
+            'This cannot be undone. Re-call with confirm: true to proceed.',
+          true,
         );
       }
       await browser.close();

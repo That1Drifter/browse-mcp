@@ -25,7 +25,7 @@ export async function downloadUrl(
   page: Page,
   url: string,
   saveDirOrOpts?: string | DownloadOptions,
-  forceFetchArg?: boolean
+  forceFetchArg?: boolean,
 ): Promise<DownloadResult> {
   // Back-compat: older callers pass (page, url, saveDir).
   let saveDir: string | undefined;
@@ -64,7 +64,8 @@ export async function downloadUrl(
     throw new Error(`URL did not trigger a download: ${url} (${reason})`);
   }
 
-  const suggested = download.suggestedFilename() || basename(new URL(url).pathname) || 'download.bin';
+  const suggested =
+    download.suggestedFilename() || basename(new URL(url).pathname) || 'download.bin';
   const outPath = join(dir, suggested);
   await download.saveAs(outPath);
 
@@ -88,7 +89,9 @@ async function fetchFallback(url: string, dir: string): Promise<DownloadResult> 
   let filename = '';
   try {
     filename = basename(new URL(url).pathname);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   if (!filename || filename === '/' || !/\.[A-Za-z0-9]+$/.test(filename)) {
     const hash = createHash('sha1').update(url).digest('hex').slice(0, 12);
     const ext = extForContentType(contentType);

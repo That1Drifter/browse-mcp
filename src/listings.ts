@@ -1,8 +1,8 @@
 import type { Page } from 'playwright';
 
 export interface ExtractOptions {
-  hrefPattern?: string;       // substring OR /regex/ (wrapped in slashes)
-  requireText?: string;       // case-insensitive substring that must appear in anchor text
+  hrefPattern?: string; // substring OR /regex/ (wrapped in slashes)
+  requireText?: string; // case-insensitive substring that must appear in anchor text
   containerSelector?: string; // scope search to inside this CSS selector
   groupBy?: 'href' | 'row' | 'auto'; // grouping mode (default 'auto')
 }
@@ -263,8 +263,6 @@ const COLLECT_FN = `(opts) => {
 }`;
 
 export async function extractListings(page: Page, opts: ExtractOptions = {}): Promise<Listing[]> {
-  const result = (await page.evaluate(
-    `(${COLLECT_FN})(${JSON.stringify(opts)})`
-  )) as Listing[];
+  const result = (await page.evaluate(`(${COLLECT_FN})(${JSON.stringify(opts)})`)) as Listing[];
   return result;
 }

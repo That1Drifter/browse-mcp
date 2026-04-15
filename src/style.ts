@@ -42,10 +42,10 @@ export async function applyStyle(
   selector: string,
   property: string,
   value: string,
-  important = false
+  important = false,
 ): Promise<StyleChange> {
   const { previousValue, matchCount } = (await page.evaluate(
-    `(${APPLY_FN})(${JSON.stringify({ selector, property, value, important })})`
+    `(${APPLY_FN})(${JSON.stringify({ selector, property, value, important })})`,
   )) as { previousValue: string; matchCount: number };
   if (matchCount === 0) throw new Error(`No elements match selector: ${selector}`);
   const change: StyleChange = {
@@ -72,7 +72,7 @@ export async function undoStyle(page: Page, count = 1): Promise<StyleChange[]> {
         property: last.property,
         previousValue: last.previousValue,
         important: last.important,
-      })})`
+      })})`,
     );
     undone.push(last);
   }

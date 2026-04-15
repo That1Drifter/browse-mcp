@@ -94,7 +94,12 @@ export async function findByText(page: Page, opts: FindOptions): Promise<FoundEl
   // Search main frame first, then child frames
   for (const frame of page.frames()) {
     try {
-      const result = (await frame.evaluate(`(${FIND_FN})(${JSON.stringify(opts)})`)) as { marker: string; tag: string; role: string; text: string } | null;
+      const result = (await frame.evaluate(`(${FIND_FN})(${JSON.stringify(opts)})`)) as {
+        marker: string;
+        tag: string;
+        role: string;
+        text: string;
+      } | null;
       if (result) {
         return {
           ...result,
@@ -112,7 +117,7 @@ export async function findByText(page: Page, opts: FindOptions): Promise<FoundEl
 export async function waitForText(
   page: Page,
   opts: FindOptions,
-  timeoutMs: number
+  timeoutMs: number,
 ): Promise<FoundElement> {
   const start = Date.now();
   const pollInterval = 250;

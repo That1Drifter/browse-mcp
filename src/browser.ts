@@ -1,4 +1,13 @@
-import { chromium, BrowserContext, Browser, Page, ConsoleMessage, Request, Response, CDPSession } from 'playwright';
+import {
+  chromium,
+  BrowserContext,
+  Browser,
+  Page,
+  ConsoleMessage,
+  Request,
+  Response,
+  CDPSession,
+} from 'playwright';
 import { mkdirSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -73,8 +82,12 @@ class BrowserManager {
     return out;
   }
 
-  getDataDir(): string { return this.dataDir; }
-  isEphemeral(): boolean { return this.ephemeral; }
+  getDataDir(): string {
+    return this.dataDir;
+  }
+  isEphemeral(): boolean {
+    return this.ephemeral;
+  }
 
   private tabIndexOf(page: Page): number {
     if (!this.context) return -1;
@@ -92,7 +105,8 @@ class BrowserManager {
         timezoneId: 'America/Chicago',
         extraHTTPHeaders: {
           'Accept-Language': 'en-US,en;q=0.9',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         },
       };
       if (this.ephemeral) {
@@ -125,7 +139,8 @@ class BrowserManager {
   }
 
   async switchMode(mode: 'headless' | 'headed', url?: string, reason?: string): Promise<void> {
-    const currentUrl = url ?? (this.page && !this.page.isClosed() ? this.page.url() : 'about:blank');
+    const currentUrl =
+      url ?? (this.page && !this.page.isClosed() ? this.page.url() : 'about:blank');
     await this.closeInternal();
     this.mode = mode;
     if (mode === 'headed') this.handoffReason = reason ?? null;
@@ -154,15 +169,28 @@ class BrowserManager {
       if (cLog.length > 500) cLog.shift();
     });
     page.on('pageerror', (err) => {
-      cLog.push({ type: 'error', text: err.message, ts: Date.now(), tabIndex: this.tabIndexOf(page) });
+      cLog.push({
+        type: 'error',
+        text: err.message,
+        ts: Date.now(),
+        tabIndex: this.tabIndexOf(page),
+      });
     });
     page.on('request', (req: Request) => {
-      nLog.push({ method: req.method(), url: req.url(), ts: Date.now(), tabIndex: this.tabIndexOf(page) });
+      nLog.push({
+        method: req.method(),
+        url: req.url(),
+        ts: Date.now(),
+        tabIndex: this.tabIndexOf(page),
+      });
       if (nLog.length > 500) nLog.shift();
     });
     page.on('response', (res: Response) => {
       const entry = nLog.find((e) => e.url === res.url() && e.status === undefined);
-      if (entry) { entry.status = res.status(); entry.ok = res.ok(); }
+      if (entry) {
+        entry.status = res.status();
+        entry.ok = res.ok();
+      }
     });
   }
 
@@ -199,9 +227,15 @@ class BrowserManager {
     await this.closeInternal();
   }
 
-  getMode(): 'headless' | 'headed' { return this.mode; }
-  isHandoff(): boolean { return this.mode === 'headed' && this.handoffReason !== null; }
-  getHandoffReason(): string | null { return this.handoffReason; }
+  getMode(): 'headless' | 'headed' {
+    return this.mode;
+  }
+  isHandoff(): boolean {
+    return this.mode === 'headed' && this.handoffReason !== null;
+  }
+  getHandoffReason(): string | null {
+    return this.handoffReason;
+  }
 }
 
 export const browser = new BrowserManager();

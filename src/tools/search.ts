@@ -20,7 +20,10 @@ export const search: ToolModule = {
         properties: {
           query: { type: 'string', description: 'Search query' },
           max_results: { type: 'number', description: 'Max results to return (default 10)' },
-          region: { type: 'string', description: 'DDG region code, e.g. "us-en", "uk-en", "wt-wt"' },
+          region: {
+            type: 'string',
+            description: 'DDG region code, e.g. "us-en", "uk-en", "wt-wt"',
+          },
           json: { type: 'boolean', description: 'Return raw JSON array instead of formatted text' },
         },
         required: ['query'],
@@ -35,7 +38,10 @@ export const search: ToolModule = {
         properties: {
           query: { type: 'string', description: 'Search query' },
           max_results: { type: 'number', description: 'Max results to return (default 10)' },
-          region: { type: 'string', description: 'DDG region code, e.g. "us-en", "uk-en", "wt-wt"' },
+          region: {
+            type: 'string',
+            description: 'DDG region code, e.g. "us-en", "uk-en", "wt-wt"',
+          },
           json: { type: 'boolean', description: 'Return raw JSON array instead of formatted text' },
         },
         required: ['query'],
@@ -67,7 +73,10 @@ export const search: ToolModule = {
         type: 'object',
         properties: {
           query: { type: 'string', description: 'Research query' },
-          max_results: { type: 'number', description: 'Number of top search results to read (default 5)' },
+          max_results: {
+            type: 'number',
+            description: 'Number of top search results to read (default 5)',
+          },
           region: { type: 'string', description: 'DDG region code, e.g. "us-en"' },
           format: {
             type: 'string',

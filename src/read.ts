@@ -21,7 +21,7 @@ export interface ReadabilityArticle {
   byline: string | null;
   siteName: string | null;
   lang: string | null;
-  content: string;       // sanitized HTML
+  content: string; // sanitized HTML
   textContent: string;
   length: number;
   excerpt: string | null;
@@ -32,7 +32,10 @@ export interface ReadOptions {
   format?: 'markdown' | 'text' | 'json';
 }
 
-export async function readArticle(page: Page, opts: ReadOptions): Promise<ReadabilityArticle | null> {
+export async function readArticle(
+  page: Page,
+  opts: ReadOptions,
+): Promise<ReadabilityArticle | null> {
   if (opts.url) {
     await page.goto(opts.url, { waitUntil: 'domcontentloaded' });
   }
@@ -84,11 +87,18 @@ export function htmlToMarkdown(html: string): string {
     } else if (tok.type === 'close') {
       // pop until matching tag (forgiving)
       for (let i = stack.length - 1; i > 0; i--) {
-        if (stack[i].tag === tok.tag) { stack.length = i; break; }
+        if (stack[i].tag === tok.tag) {
+          stack.length = i;
+          break;
+        }
       }
     }
   }
-  return render(root).replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  return (
+    render(root)
+      .replace(/\n{3,}/g, '\n\n')
+      .trim() + '\n'
+  );
 }
 
 interface Node {
@@ -122,7 +132,10 @@ function tokenize(html: string): Token[] {
         continue;
       }
       const end = html.indexOf('>', i);
-      if (end === -1) { out.push({ type: 'text', value: html.slice(i) }); break; }
+      if (end === -1) {
+        out.push({ type: 'text', value: html.slice(i) });
+        break;
+      }
       const raw = html.slice(i + 1, end);
       i = end + 1;
       if (raw.startsWith('/')) {
@@ -171,7 +184,10 @@ function decodeEntities(s: string): string {
     .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)));
 }
 
-function render(node: Node, ctx: { listType?: 'ul' | 'ol'; listIndex?: number; inPre?: boolean } = {}): string {
+function render(
+  node: Node,
+  ctx: { listType?: 'ul' | 'ol'; listIndex?: number; inPre?: boolean } = {},
+): string {
   if (node.type === 'text') {
     const v = node.value || '';
     return ctx.inPre ? v : v.replace(/\s+/g, ' ');
@@ -182,19 +198,30 @@ function render(node: Node, ctx: { listType?: 'ul' | 'ol'; listIndex?: number; i
   switch (tag) {
     case 'root':
       return inner(ctx);
-    case 'h1': return `\n\n# ${inner(ctx).trim()}\n\n`;
-    case 'h2': return `\n\n## ${inner(ctx).trim()}\n\n`;
-    case 'h3': return `\n\n### ${inner(ctx).trim()}\n\n`;
-    case 'h4': return `\n\n#### ${inner(ctx).trim()}\n\n`;
-    case 'h5': return `\n\n##### ${inner(ctx).trim()}\n\n`;
-    case 'h6': return `\n\n###### ${inner(ctx).trim()}\n\n`;
-    case 'p':  return `\n\n${inner(ctx).trim()}\n\n`;
-    case 'br': return '  \n';
-    case 'hr': return '\n\n---\n\n';
+    case 'h1':
+      return `\n\n# ${inner(ctx).trim()}\n\n`;
+    case 'h2':
+      return `\n\n## ${inner(ctx).trim()}\n\n`;
+    case 'h3':
+      return `\n\n### ${inner(ctx).trim()}\n\n`;
+    case 'h4':
+      return `\n\n#### ${inner(ctx).trim()}\n\n`;
+    case 'h5':
+      return `\n\n##### ${inner(ctx).trim()}\n\n`;
+    case 'h6':
+      return `\n\n###### ${inner(ctx).trim()}\n\n`;
+    case 'p':
+      return `\n\n${inner(ctx).trim()}\n\n`;
+    case 'br':
+      return '  \n';
+    case 'hr':
+      return '\n\n---\n\n';
     case 'strong':
-    case 'b': return `**${inner(ctx)}**`;
+    case 'b':
+      return `**${inner(ctx)}**`;
     case 'em':
-    case 'i': return `*${inner(ctx)}*`;
+    case 'i':
+      return `*${inner(ctx)}*`;
     case 'a': {
       const href = node.attrs?.href || '';
       const txt = inner(ctx).trim() || href;
@@ -224,7 +251,11 @@ function render(node: Node, ctx: { listType?: 'ul' | 'ol'; listIndex?: number; i
     case 'li':
       return inner(ctx);
     case 'blockquote': {
-      const body = inner(ctx).trim().split('\n').map((l) => `> ${l}`).join('\n');
+      const body = inner(ctx)
+        .trim()
+        .split('\n')
+        .map((l) => `> ${l}`)
+        .join('\n');
       return `\n\n${body}\n\n`;
     }
     case 'code':
@@ -243,7 +274,10 @@ function render(node: Node, ctx: { listType?: 'ul' | 'ol'; listIndex?: number; i
   }
 }
 
-export function formatArticle(article: ReadabilityArticle, format: 'markdown' | 'text' | 'json'): string {
+export function formatArticle(
+  article: ReadabilityArticle,
+  format: 'markdown' | 'text' | 'json',
+): string {
   if (format === 'json') return JSON.stringify(article, null, 2);
   if (format === 'text') return article.textContent.trim();
   const header: string[] = [];

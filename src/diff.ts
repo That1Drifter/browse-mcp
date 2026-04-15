@@ -3,12 +3,14 @@ export function unifiedDiff(a: string, b: string, context = 3): string {
   const bLines = b.split('\n');
   const lcs = buildLcs(aLines, bLines);
   const ops: Array<{ type: ' ' | '+' | '-'; line: string; aIdx: number; bIdx: number }> = [];
-  let i = aLines.length, j = bLines.length;
+  let i = aLines.length,
+    j = bLines.length;
   const stack: typeof ops = [];
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && aLines[i - 1] === bLines[j - 1]) {
       stack.push({ type: ' ', line: aLines[i - 1], aIdx: i - 1, bIdx: j - 1 });
-      i--; j--;
+      i--;
+      j--;
     } else if (j > 0 && (i === 0 || lcs[i][j - 1] >= lcs[i - 1][j])) {
       stack.push({ type: '+', line: bLines[j - 1], aIdx: i, bIdx: j - 1 });
       j--;
@@ -50,7 +52,8 @@ export function unifiedDiff(a: string, b: string, context = 3): string {
 }
 
 function buildLcs(a: string[], b: string[]): number[][] {
-  const m = a.length, n = b.length;
+  const m = a.length,
+    n = b.length;
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {

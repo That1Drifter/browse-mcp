@@ -9,8 +9,7 @@ export type ToolDef = {
 
 export type ToolResult = {
   content: Array<
-    | { type: 'text'; text: string }
-    | { type: 'image'; data: string; mimeType: string }
+    { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
   >;
   isError?: boolean;
 };
@@ -43,6 +42,8 @@ export async function currentUrl(): Promise<string | undefined> {
     // @ts-ignore — reach into manager without forcing a launch
     const page = (browser as any).page;
     if (page && !page.isClosed()) return page.url();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return undefined;
 }

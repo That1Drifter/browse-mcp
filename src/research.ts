@@ -23,7 +23,7 @@ const PER_SOURCE_CAP_BYTES = 6 * 1024;
 
 export async function research(
   page: Page,
-  opts: ResearchOptions
+  opts: ResearchOptions,
 ): Promise<{ output: string; sources: ResearchSource[] }> {
   const format = opts.format || 'markdown';
   const maxResults = opts.maxResults ?? 5;
@@ -55,7 +55,11 @@ export async function research(
   return { output, sources };
 }
 
-function aggregate(sources: ResearchSource[], format: 'markdown' | 'text' | 'json', query: string): string {
+function aggregate(
+  sources: ResearchSource[],
+  format: 'markdown' | 'text' | 'json',
+  query: string,
+): string {
   if (format === 'json') {
     return JSON.stringify(
       sources.map((s) => ({
@@ -67,7 +71,7 @@ function aggregate(sources: ResearchSource[], format: 'markdown' | 'text' | 'jso
         truncated: s.truncated,
       })),
       null,
-      2
+      2,
     );
   }
 
@@ -84,9 +88,10 @@ function aggregate(sources: ResearchSource[], format: 'markdown' | 'text' | 'jso
   }
 
   ok.forEach((s, idx) => {
-    const header = format === 'markdown'
-      ? `## [${s.title || s.url}](${s.url})\n_source ${idx + 1} of ${total}_\n`
-      : `${s.title || s.url}\n${s.url}\n(source ${idx + 1} of ${total})\n`;
+    const header =
+      format === 'markdown'
+        ? `## [${s.title || s.url}](${s.url})\n_source ${idx + 1} of ${total}_\n`
+        : `${s.title || s.url}\n${s.url}\n(source ${idx + 1} of ${total})\n`;
     parts.push(`${header}\n${s.content}\n\n---\n`);
   });
 
@@ -107,7 +112,11 @@ function aggregate(sources: ResearchSource[], format: 'markdown' | 'text' | 'jso
 
   if (anyTruncated) {
     const note = `_(per-source body capped at ${PER_SOURCE_CAP_BYTES} bytes; some sections were truncated.)_`;
-    parts.push(format === 'markdown' ? `\n${note}\n` : `\n(per-source body capped at ${PER_SOURCE_CAP_BYTES} bytes; some sections were truncated.)\n`);
+    parts.push(
+      format === 'markdown'
+        ? `\n${note}\n`
+        : `\n(per-source body capped at ${PER_SOURCE_CAP_BYTES} bytes; some sections were truncated.)\n`,
+    );
   }
 
   return parts.join('\n');
