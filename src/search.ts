@@ -201,7 +201,7 @@ async function bingSearch(query: string, maxResults: number): Promise<SearchResu
   return parseBingResults(html, maxResults);
 }
 
-function parseBingResults(html: string, max: number): SearchResult[] {
+export function parseBingResults(html: string, max: number): SearchResult[] {
   const out: SearchResult[] = [];
   const seen = new Set<string>();
   const liRe = /<li class="b_algo"[\s\S]*?<\/li>/g;
@@ -234,7 +234,7 @@ function parseBingResults(html: string, max: number): SearchResult[] {
   return out;
 }
 
-function unwrapBingRedirect(href: string): string {
+export function unwrapBingRedirect(href: string): string {
   // Bing wraps in https://www.bing.com/ck/a?...&u=a1<base64url-of-real-url>&...
   try {
     const u = new URL(href, 'https://www.bing.com/');
@@ -255,7 +255,7 @@ function unwrapBingRedirect(href: string): string {
   }
 }
 
-function parseResults(html: string, max: number): SearchResult[] {
+export function parseResults(html: string, max: number): SearchResult[] {
   const out: SearchResult[] = [];
   const seen = new Set<string>();
   // Anchor on each title link; look ahead a bounded window for its snippet.
@@ -283,7 +283,7 @@ function parseResults(html: string, max: number): SearchResult[] {
   return out;
 }
 
-function unwrapDdgRedirect(href: string): string {
+export function unwrapDdgRedirect(href: string): string {
   // DDG wraps results: //duckduckgo.com/l/?uddg=<encoded>&rut=...
   try {
     const abs = href.startsWith('//') ? 'https:' + href : href;
@@ -302,7 +302,7 @@ function stripTags(s: string): string {
   return decodeEntities(s.replace(/<[^>]+>/g, ''));
 }
 
-function decodeEntities(s: string): string {
+export function decodeEntities(s: string): string {
   return s
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
