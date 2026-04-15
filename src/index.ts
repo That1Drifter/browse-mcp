@@ -64,6 +64,7 @@ const tools = [
         max_lines: { type: 'number', description: 'Truncate output at N lines (default 500)' },
         diff: { type: 'boolean', description: 'Return diff vs previous snapshot' },
         clean: { type: 'boolean', description: 'Run cleanup (all categories: ads, cookie banners, sticky bars, social popups) before snapshotting' },
+        no_collapse: { type: 'boolean', description: 'Emit the literal tree without collapsing single-child [generic] wrapper chains (default: collapse enabled)' },
       },
     },
   },
@@ -522,6 +523,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           maxDepth: a.max_depth,
           selector: a.selector,
           cursorInteractive: !!a.cursor_interactive,
+          noCollapse: !!a.no_collapse,
         });
         const lines = tree.split('\n');
         if (lines.length > maxLines) {
