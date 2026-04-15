@@ -1,7 +1,14 @@
-import { chromium, BrowserContext, Page, ConsoleMessage, Request, Response, CDPSession } from 'playwright';
+import { chromium, BrowserContext, Browser, Page, ConsoleMessage, Request, Response, CDPSession } from 'playwright';
 import { mkdirSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+
+// Ephemeral mode: no on-disk profile. Uses a fresh browser (launch) + context per run
+// so cookies/localStorage/auth never persist. Opt in with BROWSE_MCP_EPHEMERAL=1.
+export const EPHEMERAL = (() => {
+  const v = (process.env.BROWSE_MCP_EPHEMERAL ?? '').toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+})();
 
 export interface ConsoleEntry {
   type: string;
@@ -26,9 +33,11 @@ export const DEFAULT_DATA_DIR = process.env.BROWSE_MCP_HOME
 
 class BrowserManager {
   private context: BrowserContext | null = null;
+  private browser: Browser | null = null;
   private page: Page | null = null;
   private mode: 'headless' | 'headed' = 'headless';
   private dataDir: string = DEFAULT_DATA_DIR;
+  private ephemeral: boolean = EPHEMERAL;
   private cdp: CDPSession | null = null;
   private loggerAttached: WeakSet<Page> = new WeakSet();
   private consoleLogs: WeakMap<Page, ConsoleEntry[]> = new WeakMap();
@@ -65,6 +74,7 @@ class BrowserManager {
   }
 
   getDataDir(): string { return this.dataDir; }
+  isEphemeral(): boolean { return this.ephemeral; }
 
   private tabIndexOf(page: Page): number {
     if (!this.context) return -1;
@@ -74,9 +84,7 @@ class BrowserManager {
   async getPage(): Promise<Page> {
     if (this.page && !this.page.isClosed()) return this.page;
     if (!this.context) {
-      if (!existsSync(this.dataDir)) mkdirSync(this.dataDir, { recursive: true });
-      this.context = await chromium.launchPersistentContext(this.dataDir, {
-        headless: this.mode === 'headless',
+      const contextOpts = {
         viewport: { width: 1280, height: 720 },
         userAgent:
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
@@ -86,7 +94,17 @@ class BrowserManager {
           'Accept-Language': 'en-US,en;q=0.9',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         },
-      });
+      };
+      if (this.ephemeral) {
+        this.browser = await chromium.launch({ headless: this.mode === 'headless' });
+        this.context = await this.browser.newContext(contextOpts);
+      } else {
+        if (!existsSync(this.dataDir)) mkdirSync(this.dataDir, { recursive: true });
+        this.context = await chromium.launchPersistentContext(this.dataDir, {
+          headless: this.mode === 'headless',
+          ...contextOpts,
+        });
+      }
       // Soft stealth: remove the `navigator.webdriver` tell that WAFs check for
       await this.context.addInitScript(() => {
         Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
@@ -170,6 +188,10 @@ class BrowserManager {
       await this.context.close().catch(() => {});
       this.context = null;
       this.page = null;
+    }
+    if (this.browser) {
+      await this.browser.close().catch(() => {});
+      this.browser = null;
     }
   }
 
