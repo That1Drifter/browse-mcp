@@ -103,6 +103,15 @@ class BrowserManager {
     });
   }
 
+  getAllPages(): Page[] {
+    return this.context ? this.context.pages() : [];
+  }
+
+  setActivePage(page: Page): void {
+    this.page = page;
+    this.attachLoggers(page);
+  }
+
   clearConsole() { this.consoleLog = []; }
   clearNetwork() { this.networkLog = []; }
 

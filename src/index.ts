@@ -342,7 +342,7 @@ const tools = [
   {
     name: 'browser_handoff',
     description:
-      'Open the current page in a visible Chrome window so the user can interact (CAPTCHA, MFA, OAuth). State (cookies, localStorage, tabs) is preserved via a persistent profile. After the user is done, call browser_resume to return to headless. USE SPARINGLY — only when you genuinely cannot proceed headlessly.',
+      'Open the current page in a visible Chrome window so the user can interact (CAPTCHA, MFA, OAuth). State (cookies, localStorage, tabs) is preserved via a persistent profile. Because the profile at ~/.browse-mcp/chromium-profile/ survives across sessions, cookies/localStorage/auth persist too — so OAuth/MFA/CAPTCHA typically only needs to be completed once per service. After the user is done, call browser_resume to return to headless. USE SPARINGLY — only when you genuinely cannot proceed headlessly.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -387,6 +387,24 @@ const tools = [
       },
     },
   },
+  {
+    name: 'browser_tabs',
+    description:
+      'List all open browser tabs as JSON: [{index, url, title, active}]. Use together with browser_switch_tab to drive multi-tab workflows (links that open in a new tab, popup windows, etc.).',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'browser_switch_tab',
+    description:
+      'Switch the active tab by index (from browser_tabs). Subsequent browse tools act on the chosen tab. Returns the new active URL.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        index: { type: 'number', description: 'Tab index from browser_tabs' },
+      },
+      required: ['index'],
+    },
+  },
 ];
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
@@ -399,7 +417,24 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     switch (name) {
       case 'browser_navigate': {
         const page = await browser.getPage();
-        await page.goto(a.url, { waitUntil: a.wait_until || 'load' });
+        const url: string = a.url;
+        if (typeof url === 'string' && /\.pdf(\?.*)?$/i.test(url)) {
+          const result = await downloadUrl(page, url);
+          return text(
+            `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). Use browser_download to fetch directly next time.`
+          );
+        }
+        try {
+          await page.goto(url, { waitUntil: a.wait_until || 'load' });
+        } catch (e: any) {
+          if (/download is starting/i.test(e?.message || '')) {
+            const result = await downloadUrl(page, url);
+            return text(
+              `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). Use browser_download to fetch directly next time.`
+            );
+          }
+          throw e;
+        }
         return text(`Navigated to ${page.url()}`);
       }
 
@@ -677,6 +712,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         await browser.switchMode('headed', url, a.reason || 'handoff');
         return text(
           `Visible Chrome window opened at ${url}. Reason: ${a.reason || '(unspecified)'}. ` +
+          `Cookies/localStorage/auth persist across sessions via the profile at ~/.browse-mcp/chromium-profile/, so OAuth/MFA/CAPTCHA typically only needs to be completed once per service. ` +
           `Ask the user to complete the task, then call browser_resume.`
         );
       }
@@ -725,6 +761,34 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           return `${head}\n${body}`;
         });
         return text(lines.join('\n\n') + `\n\n(source: ${logPath()})`);
+      }
+
+      case 'browser_tabs': {
+        await browser.getPage();
+        const pages = browser.getAllPages();
+        const active = (browser as any).page;
+        const list = await Promise.all(
+          pages.map(async (p, index) => ({
+            index,
+            url: p.url(),
+            title: await p.title().catch(() => ''),
+            active: p === active,
+          }))
+        );
+        return text(JSON.stringify(list, null, 2));
+      }
+
+      case 'browser_switch_tab': {
+        await browser.getPage();
+        const pages = browser.getAllPages();
+        const idx = a.index;
+        if (typeof idx !== 'number' || idx < 0 || idx >= pages.length) {
+          return text(`Invalid tab index ${idx}. Have ${pages.length} tab(s).`, true);
+        }
+        const target = pages[idx];
+        browser.setActivePage(target);
+        await target.bringToFront().catch(() => {});
+        return text(`Switched to tab ${idx}: ${target.url()}`);
       }
 
       default:
