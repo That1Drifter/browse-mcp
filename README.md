@@ -154,10 +154,12 @@ Bundles: `core` (nav/snapshot/click/type/eval/wait/close, 8 tools), `search` (4)
 ### Search & research
 | Tool | What it does |
 |---|---|
-| `browser_search` | Web search via DuckDuckGo HTML endpoint. No API key, no browser. Falls back to Bing if DDG returns nothing |
+| `browser_search` | Web search via DuckDuckGo HTML endpoint. No API key, no browser. Falls back to Bing if DDG returns nothing. Optional Brave Search API via `BROWSE_MCP_BRAVE_API_KEY` |
 | `browser_search_news` | News search with timestamps and source |
 | `browser_search_images` | Image search — title/image/thumbnail/dimensions/source |
 | `browser_research` | **Macro:** search → read top N → concatenated Markdown. One call. |
+
+> **Heads up — search endpoints are unofficial.** `browser_search` / `_news` / `_images` scrape `html.duckduckgo.com`, `duckduckgo.com/i.js`, `duckduckgo.com/news.js`, and Bing's `b_algo` HTML. None of these are documented APIs, so a provider layout change can break parsing. When a parser returns zero results, browse-mcp logs a structured event to `~/.browse-mcp/issues.jsonl` (visible via `browser_review_issues`) and surfaces an explanatory error. For a supported API-based fallback, set `BROWSE_MCP_BRAVE_API_KEY` to a [Brave Search API](https://api.search.brave.com/) key — Brave is then tried first for `browser_search`, with DDG/Bing as the backup path.
 
 ### Screenshots & visual
 | Tool | What it does |
