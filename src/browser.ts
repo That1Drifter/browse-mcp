@@ -8,6 +8,7 @@ export interface ConsoleEntry {
   text: string;
   location?: string;
   ts: number;
+  tabIndex?: number;
 }
 
 export interface NetworkEntry {
@@ -16,9 +17,10 @@ export interface NetworkEntry {
   status?: number;
   ok?: boolean;
   ts: number;
+  tabIndex?: number;
 }
 
-const DEFAULT_DATA_DIR = process.env.BROWSE_MCP_HOME
+export const DEFAULT_DATA_DIR = process.env.BROWSE_MCP_HOME
   ? join(process.env.BROWSE_MCP_HOME, 'chromium-profile')
   : join(homedir(), '.browse-mcp', 'chromium-profile');
 
@@ -29,10 +31,45 @@ class BrowserManager {
   private dataDir: string = DEFAULT_DATA_DIR;
   private cdp: CDPSession | null = null;
   private loggerAttached: WeakSet<Page> = new WeakSet();
-  consoleLog: ConsoleEntry[] = [];
-  networkLog: NetworkEntry[] = [];
+  private consoleLogs: WeakMap<Page, ConsoleEntry[]> = new WeakMap();
+  private networkLogs: WeakMap<Page, NetworkEntry[]> = new WeakMap();
   lastSnapshot: string = '';
   handoffReason: string | null = null;
+
+  get consoleLog(): ConsoleEntry[] {
+    if (!this.page) return [];
+    return this.consoleLogs.get(this.page) ?? [];
+  }
+
+  get networkLog(): NetworkEntry[] {
+    if (!this.page) return [];
+    return this.networkLogs.get(this.page) ?? [];
+  }
+
+  getAllConsoleLogs(): ConsoleEntry[] {
+    const out: ConsoleEntry[] = [];
+    for (const p of this.getAllPages()) {
+      const arr = this.consoleLogs.get(p);
+      if (arr) out.push(...arr);
+    }
+    return out;
+  }
+
+  getAllNetworkLogs(): NetworkEntry[] {
+    const out: NetworkEntry[] = [];
+    for (const p of this.getAllPages()) {
+      const arr = this.networkLogs.get(p);
+      if (arr) out.push(...arr);
+    }
+    return out;
+  }
+
+  getDataDir(): string { return this.dataDir; }
+
+  private tabIndexOf(page: Page): number {
+    if (!this.context) return -1;
+    return this.context.pages().indexOf(page);
+  }
 
   async getPage(): Promise<Page> {
     if (this.page && !this.page.isClosed()) return this.page;
@@ -84,24 +121,29 @@ class BrowserManager {
   private attachLoggers(page: Page) {
     if (this.loggerAttached.has(page)) return;
     this.loggerAttached.add(page);
+    if (!this.consoleLogs.has(page)) this.consoleLogs.set(page, []);
+    if (!this.networkLogs.has(page)) this.networkLogs.set(page, []);
+    const cLog = this.consoleLogs.get(page)!;
+    const nLog = this.networkLogs.get(page)!;
     page.on('console', (msg: ConsoleMessage) => {
-      this.consoleLog.push({
+      cLog.push({
         type: msg.type(),
         text: msg.text(),
         location: msg.location()?.url,
         ts: Date.now(),
+        tabIndex: this.tabIndexOf(page),
       });
-      if (this.consoleLog.length > 500) this.consoleLog.shift();
+      if (cLog.length > 500) cLog.shift();
     });
     page.on('pageerror', (err) => {
-      this.consoleLog.push({ type: 'error', text: err.message, ts: Date.now() });
+      cLog.push({ type: 'error', text: err.message, ts: Date.now(), tabIndex: this.tabIndexOf(page) });
     });
     page.on('request', (req: Request) => {
-      this.networkLog.push({ method: req.method(), url: req.url(), ts: Date.now() });
-      if (this.networkLog.length > 500) this.networkLog.shift();
+      nLog.push({ method: req.method(), url: req.url(), ts: Date.now(), tabIndex: this.tabIndexOf(page) });
+      if (nLog.length > 500) nLog.shift();
     });
     page.on('response', (res: Response) => {
-      const entry = this.networkLog.find((e) => e.url === res.url() && e.status === undefined);
+      const entry = nLog.find((e) => e.url === res.url() && e.status === undefined);
       if (entry) { entry.status = res.status(); entry.ok = res.ok(); }
     });
   }
@@ -115,8 +157,12 @@ class BrowserManager {
     this.attachLoggers(page);
   }
 
-  clearConsole() { this.consoleLog = []; }
-  clearNetwork() { this.networkLog = []; }
+  clearConsole() {
+    if (this.page) this.consoleLogs.set(this.page, []);
+  }
+  clearNetwork() {
+    if (this.page) this.networkLogs.set(this.page, []);
+  }
 
   private async closeInternal() {
     this.cdp = null;
