@@ -24,31 +24,73 @@ const SHORTHAND_LONGHANDS: Record<string, string[]> = {
   margin: ['margin-top', 'margin-right', 'margin-bottom', 'margin-left'],
   padding: ['padding-top', 'padding-right', 'padding-bottom', 'padding-left'],
   border: [
-    'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
-    'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
-    'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
-    'border-width', 'border-style', 'border-color',
+    'border-top-width',
+    'border-right-width',
+    'border-bottom-width',
+    'border-left-width',
+    'border-top-style',
+    'border-right-style',
+    'border-bottom-style',
+    'border-left-style',
+    'border-top-color',
+    'border-right-color',
+    'border-bottom-color',
+    'border-left-color',
+    'border-width',
+    'border-style',
+    'border-color',
   ],
   'border-top': ['border-top-width', 'border-top-style', 'border-top-color'],
   'border-right': ['border-right-width', 'border-right-style', 'border-right-color'],
   'border-bottom': ['border-bottom-width', 'border-bottom-style', 'border-bottom-color'],
   'border-left': ['border-left-width', 'border-left-style', 'border-left-color'],
-  font: ['font-style', 'font-variant', 'font-weight', 'font-stretch', 'font-size', 'line-height', 'font-family'],
+  font: [
+    'font-style',
+    'font-variant',
+    'font-weight',
+    'font-stretch',
+    'font-size',
+    'line-height',
+    'font-family',
+  ],
   background: [
-    'background-color', 'background-image', 'background-repeat', 'background-attachment',
-    'background-position', 'background-position-x', 'background-position-y',
-    'background-size', 'background-origin', 'background-clip',
+    'background-color',
+    'background-image',
+    'background-repeat',
+    'background-attachment',
+    'background-position',
+    'background-position-x',
+    'background-position-y',
+    'background-size',
+    'background-origin',
+    'background-clip',
   ],
   animation: [
-    'animation-name', 'animation-duration', 'animation-timing-function', 'animation-delay',
-    'animation-iteration-count', 'animation-direction', 'animation-fill-mode', 'animation-play-state',
+    'animation-name',
+    'animation-duration',
+    'animation-timing-function',
+    'animation-delay',
+    'animation-iteration-count',
+    'animation-direction',
+    'animation-fill-mode',
+    'animation-play-state',
   ],
-  transition: ['transition-property', 'transition-duration', 'transition-timing-function', 'transition-delay'],
+  transition: [
+    'transition-property',
+    'transition-duration',
+    'transition-timing-function',
+    'transition-delay',
+  ],
   flex: ['flex-grow', 'flex-shrink', 'flex-basis'],
   grid: [
-    'grid-template-rows', 'grid-template-columns', 'grid-template-areas',
-    'grid-auto-rows', 'grid-auto-columns', 'grid-auto-flow',
-    'grid-row-gap', 'grid-column-gap',
+    'grid-template-rows',
+    'grid-template-columns',
+    'grid-template-areas',
+    'grid-auto-rows',
+    'grid-auto-columns',
+    'grid-auto-flow',
+    'grid-row-gap',
+    'grid-column-gap',
   ],
   'list-style': ['list-style-type', 'list-style-position', 'list-style-image'],
   outline: ['outline-width', 'outline-style', 'outline-color'],
@@ -59,49 +101,79 @@ const SHORTHAND_LONGHANDS: Record<string, string[]> = {
 };
 
 const INTERESTING_COMPUTED = [
-  'display', 'position', 'top', 'left', 'right', 'bottom', 'width', 'height',
-  'margin', 'padding', 'border', 'background-color', 'color', 'font-size',
-  'font-family', 'font-weight', 'line-height', 'text-align',
-  'flex-direction', 'justify-content', 'align-items', 'gap',
-  'grid-template-columns', 'grid-template-rows',
-  'z-index', 'opacity', 'transform', 'visibility', 'overflow', 'cursor',
+  'display',
+  'position',
+  'top',
+  'left',
+  'right',
+  'bottom',
+  'width',
+  'height',
+  'margin',
+  'padding',
+  'border',
+  'background-color',
+  'color',
+  'font-size',
+  'font-family',
+  'font-weight',
+  'line-height',
+  'text-align',
+  'flex-direction',
+  'justify-content',
+  'align-items',
+  'gap',
+  'grid-template-columns',
+  'grid-template-rows',
+  'z-index',
+  'opacity',
+  'transform',
+  'visibility',
+  'overflow',
+  'cursor',
 ];
 
 export async function inspectElement(
   page: Page,
   cdp: CDPSession,
   selector: string,
-  includeUserAgent = false
+  includeUserAgent = false,
 ): Promise<InspectResult> {
   // Find the element via Playwright, get its backendNodeId via CDP
   const handle = await page.locator(selector).first().elementHandle();
   if (!handle) throw new Error(`Element not found: ${selector}`);
 
-  const { object } = await cdp.send('DOM.resolveNode' as any, {
-    // @ts-ignore
-    objectId: (handle as any)._objectId,
-  }).catch(async () => {
-    // Fallback: use describeNode via objectId from the handle
-    return { object: null };
-  }) as any;
+  const { object } = (await cdp
+    .send('DOM.resolveNode' as any, {
+      // @ts-ignore
+      objectId: (handle as any)._objectId,
+    })
+    .catch(async () => {
+      // Fallback: use describeNode via objectId from the handle
+      return { object: null };
+    })) as any;
 
   // Enable CSS + DOM domains (idempotent)
   await cdp.send('DOM.enable' as any, {}).catch(() => {});
   await cdp.send('CSS.enable' as any, {}).catch(() => {});
 
   // Use DOM.getDocument + querySelector to get nodeId reliably
-  const { root } = await cdp.send('DOM.getDocument' as any, { depth: -1 }) as any;
-  const { nodeId } = await cdp.send('DOM.querySelector' as any, {
+  const { root } = (await cdp.send('DOM.getDocument' as any, { depth: -1 })) as any;
+  const { nodeId } = (await cdp.send('DOM.querySelector' as any, {
     nodeId: root.nodeId,
     selector,
-  }) as any;
+  })) as any;
   if (!nodeId) throw new Error(`Element not found via CDP: ${selector}`);
 
-  const { attributes: attrArray = [] } = await cdp.send('DOM.getAttributes' as any, { nodeId }).catch(() => ({ attributes: [] })) as any;
+  const { attributes: attrArray = [] } = (await cdp
+    .send('DOM.getAttributes' as any, { nodeId })
+    .catch(() => ({ attributes: [] }))) as any;
   const attributes: Record<string, string> = {};
   for (let i = 0; i + 1 < attrArray.length; i += 2) attributes[attrArray[i]] = attrArray[i + 1];
 
-  const matched = await cdp.send('CSS.getMatchedStylesForNode' as any, { nodeId }).catch(() => null) as any;
+  const matched = (await cdp
+    .send('CSS.getMatchedStylesForNode' as any, { nodeId })
+    .catch(() => null)) as any;
 
   const rules: CSSRule[] = [];
   if (matched) {
@@ -114,7 +186,12 @@ export async function inspectElement(
         selector: '(inline style)',
         properties: inline.cssProperties
           .filter((p: any) => p.name)
-          .map((p: any) => ({ name: p.name, value: p.value, important: !!p.important, disabled: !!p.disabled })),
+          .map((p: any) => ({
+            name: p.name,
+            value: p.value,
+            important: !!p.important,
+            disabled: !!p.disabled,
+          })),
       });
     }
     // Matched rules
@@ -131,7 +208,12 @@ export async function inspectElement(
         source,
         properties: (r.style?.cssProperties || [])
           .filter((p: any) => p.name)
-          .map((p: any) => ({ name: p.name, value: p.value, important: !!p.important, disabled: !!p.disabled })),
+          .map((p: any) => ({
+            name: p.name,
+            value: p.value,
+            important: !!p.important,
+            disabled: !!p.disabled,
+          })),
       });
     }
   }
@@ -151,7 +233,7 @@ export async function inspectElement(
       for (const p of props) out[p] = s.getPropertyValue(p);
       return out;
     },
-    { sel: selector, props: INTERESTING_COMPUTED }
+    { sel: selector, props: INTERESTING_COMPUTED },
   );
 
   // Box model
@@ -159,7 +241,9 @@ export async function inspectElement(
   try {
     const b = await handle.boundingBox();
     if (b) boxModel = { width: b.width, height: b.height, x: b.x, y: b.y };
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   const tagName = attributes.__tag || 'unknown';
   const tag = await page.evaluate((s) => {
@@ -180,8 +264,18 @@ export async function inspectElement(
 
 export function formatInspect(r: InspectResult): string {
   const lines: string[] = [];
-  lines.push(`${r.tagName.toLowerCase()}${Object.keys(r.attributes).length ? ' ' + Object.entries(r.attributes).map(([k,v]) => `${k}="${v}"`).join(' ') : ''}`);
-  if (r.boxModel) lines.push(`box: ${r.boxModel.width}x${r.boxModel.height} @ (${r.boxModel.x},${r.boxModel.y})`);
+  lines.push(
+    `${r.tagName.toLowerCase()}${
+      Object.keys(r.attributes).length
+        ? ' ' +
+          Object.entries(r.attributes)
+            .map(([k, v]) => `${k}="${v}"`)
+            .join(' ')
+        : ''
+    }`,
+  );
+  if (r.boxModel)
+    lines.push(`box: ${r.boxModel.width}x${r.boxModel.height} @ (${r.boxModel.x},${r.boxModel.y})`);
   lines.push('');
 
   if (Object.keys(r.inlineStyle).length) {
@@ -192,8 +286,14 @@ export function formatInspect(r: InspectResult): string {
 
   lines.push('matched rules (author first):');
   const author = r.matchedRules.filter((x) => x.origin === 'regular' || x.origin === 'author');
-  const other = r.matchedRules.filter((x) => x.origin !== 'regular' && x.origin !== 'author' && x.origin !== 'inline');
-  for (const rule of [...r.matchedRules.filter((x) => x.origin === 'inline'), ...author, ...other]) {
+  const other = r.matchedRules.filter(
+    (x) => x.origin !== 'regular' && x.origin !== 'author' && x.origin !== 'inline',
+  );
+  for (const rule of [
+    ...r.matchedRules.filter((x) => x.origin === 'inline'),
+    ...author,
+    ...other,
+  ]) {
     lines.push(`  [${rule.origin}] ${rule.selector}${rule.source ? ` (${rule.source})` : ''}`);
     const declared = new Set(rule.properties.map((p) => p.name));
     const suppressed = new Set<string>();

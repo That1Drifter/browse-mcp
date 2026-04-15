@@ -8,13 +8,17 @@ export const debug: ToolModule = {
   tools: [
     {
       name: 'browser_console',
-      description: 'Get captured browser console messages (log/warn/error/etc). Set clear=true to reset the buffer after reading.',
+      description:
+        'Get captured browser console messages (log/warn/error/etc). Set clear=true to reset the buffer after reading.',
       inputSchema: {
         type: 'object',
         properties: {
           errors_only: { type: 'boolean', description: 'Only error/warning entries' },
           clear: { type: 'boolean', description: 'Clear buffer after reading' },
-          all_tabs: { type: 'boolean', description: 'Include entries from every tab (prefixed with [tab N])' },
+          all_tabs: {
+            type: 'boolean',
+            description: 'Include entries from every tab (prefixed with [tab N])',
+          },
         },
       },
     },
@@ -24,9 +28,15 @@ export const debug: ToolModule = {
       inputSchema: {
         type: 'object',
         properties: {
-          failed_only: { type: 'boolean', description: 'Only failed (status >= 400 or no response) requests' },
+          failed_only: {
+            type: 'boolean',
+            description: 'Only failed (status >= 400 or no response) requests',
+          },
           clear: { type: 'boolean', description: 'Clear buffer after reading' },
-          all_tabs: { type: 'boolean', description: 'Include entries from every tab (prefixed with [tab N])' },
+          all_tabs: {
+            type: 'boolean',
+            description: 'Include entries from every tab (prefixed with [tab N])',
+          },
         },
       },
     },
@@ -43,8 +53,14 @@ export const debug: ToolModule = {
       inputSchema: {
         type: 'object',
         properties: {
-          selector: { type: 'string', description: 'CSS selector or @ref of the element to inspect' },
-          include_user_agent: { type: 'boolean', description: 'Include user-agent stylesheet rules (default: false)' },
+          selector: {
+            type: 'string',
+            description: 'CSS selector or @ref of the element to inspect',
+          },
+          include_user_agent: {
+            type: 'boolean',
+            description: 'Include user-agent stylesheet rules (default: false)',
+          },
         },
         required: ['selector'],
       },
@@ -54,11 +70,14 @@ export const debug: ToolModule = {
     async browser_console(a) {
       await browser.getPage();
       let entries = a.all_tabs ? browser.getAllConsoleLogs() : browser.consoleLog;
-      if (a.errors_only) entries = entries.filter((e) => e.type === 'error' || e.type === 'warning');
-      const out = entries.map((e) => {
-        const prefix = a.all_tabs ? `[tab ${e.tabIndex ?? '?'}] ` : '';
-        return `${prefix}[${e.type}] ${e.text}${e.location ? ` (${e.location})` : ''}`;
-      }).join('\n');
+      if (a.errors_only)
+        entries = entries.filter((e) => e.type === 'error' || e.type === 'warning');
+      const out = entries
+        .map((e) => {
+          const prefix = a.all_tabs ? `[tab ${e.tabIndex ?? '?'}] ` : '';
+          return `${prefix}[${e.type}] ${e.text}${e.location ? ` (${e.location})` : ''}`;
+        })
+        .join('\n');
       if (a.clear) browser.clearConsole();
       return text(out || '(no console messages)');
     },
@@ -66,11 +85,14 @@ export const debug: ToolModule = {
     async browser_network(a) {
       await browser.getPage();
       let entries = a.all_tabs ? browser.getAllNetworkLogs() : browser.networkLog;
-      if (a.failed_only) entries = entries.filter((e) => e.status === undefined || (e.status && e.status >= 400));
-      const out = entries.map((e) => {
-        const prefix = a.all_tabs ? `[tab ${e.tabIndex ?? '?'}] ` : '';
-        return `${prefix}${e.method} ${e.status ?? 'pending'} ${e.url}`;
-      }).join('\n');
+      if (a.failed_only)
+        entries = entries.filter((e) => e.status === undefined || (e.status && e.status >= 400));
+      const out = entries
+        .map((e) => {
+          const prefix = a.all_tabs ? `[tab ${e.tabIndex ?? '?'}] ` : '';
+          return `${prefix}${e.method} ${e.status ?? 'pending'} ${e.url}`;
+        })
+        .join('\n');
       if (a.clear) browser.clearNetwork();
       return text(out || '(no network activity)');
     },

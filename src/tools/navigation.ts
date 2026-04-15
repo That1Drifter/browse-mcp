@@ -59,7 +59,8 @@ export const navigation: ToolModule = {
     },
     {
       name: 'browser_hover',
-      description: 'Hover over an element (by @ref or selector) to trigger hover states, menus, tooltips.',
+      description:
+        'Hover over an element (by @ref or selector) to trigger hover states, menus, tooltips.',
       inputSchema: {
         type: 'object',
         properties: { target: { type: 'string', description: '@ref or CSS selector' } },
@@ -74,7 +75,11 @@ export const navigation: ToolModule = {
         type: 'object',
         properties: {
           target: { type: 'string', description: '@ref or CSS selector to scroll into view' },
-          to: { type: 'string', enum: ['top', 'bottom'], description: 'Scroll to top or bottom of page' },
+          to: {
+            type: 'string',
+            enum: ['top', 'bottom'],
+            description: 'Scroll to top or bottom of page',
+          },
         },
       },
     },
@@ -101,8 +106,15 @@ export const navigation: ToolModule = {
       inputSchema: {
         type: 'object',
         properties: {
-          text: { type: 'string', description: 'Text to search for (matches aria-label, title, placeholder, or textContent)' },
-          role: { type: 'string', description: 'Optional role/tag filter: button, link, textbox, heading' },
+          text: {
+            type: 'string',
+            description:
+              'Text to search for (matches aria-label, title, placeholder, or textContent)',
+          },
+          role: {
+            type: 'string',
+            description: 'Optional role/tag filter: button, link, textbox, heading',
+          },
           exact: { type: 'boolean', description: 'Exact match (default: substring)' },
           case_sensitive: { type: 'boolean', description: 'Case-sensitive match (default: false)' },
           action: {
@@ -130,7 +142,8 @@ export const navigation: ToolModule = {
     },
     {
       name: 'browser_eval',
-      description: 'Run a JavaScript expression in the page context and return the result as a string.',
+      description:
+        'Run a JavaScript expression in the page context and return the result as a string.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -152,7 +165,7 @@ export const navigation: ToolModule = {
       if (typeof url === 'string' && /\.pdf(\?.*)?$/i.test(url)) {
         const result = await downloadUrl(page, url);
         return text(
-          `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). Use browser_download to fetch directly next time.`
+          `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). Use browser_download to fetch directly next time.`,
         );
       }
       try {
@@ -161,7 +174,7 @@ export const navigation: ToolModule = {
         if (/download is starting/i.test(e?.message || '')) {
           const result = await downloadUrl(page, url);
           return text(
-            `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). Use browser_download to fetch directly next time.`
+            `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). Use browser_download to fetch directly next time.`,
           );
         }
         throw e;
@@ -169,12 +182,20 @@ export const navigation: ToolModule = {
       let msg = `Navigated to ${page.url()}`;
       try {
         const currentUrl = page.url();
-        const urlHit = /\/static-pages\/418|\/cdn-cgi\/|\/distil_r_captcha|\/_recaptcha/i.test(currentUrl);
+        const urlHit = /\/static-pages\/418|\/cdn-cgi\/|\/distil_r_captcha|\/_recaptcha/i.test(
+          currentUrl,
+        );
         const bodyHit = await Promise.race([
           page.evaluate(() => {
             const t = (document.body?.innerText || '').toLowerCase();
             const title = (document.title || '').toLowerCase();
-            const needles = ['checking your browser', 'verify you are human', 'captcha', 'cloudflare', 'challenge'];
+            const needles = [
+              'checking your browser',
+              'verify you are human',
+              'captcha',
+              'cloudflare',
+              'challenge',
+            ];
             return needles.some((n) => t.includes(n) || title.includes(n));
           }),
           new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 300)),
@@ -182,7 +203,9 @@ export const navigation: ToolModule = {
         if (urlHit || bodyHit) {
           msg += `\n\n[heads-up] Looks like a bot-detection / CAPTCHA interstitial. Consider browser_handoff to let the user solve it interactively.`;
         }
-      } catch { /* silent */ }
+      } catch {
+        /* silent */
+      }
       return text(msg);
     },
 
@@ -263,19 +286,36 @@ export const navigation: ToolModule = {
         exact: !!a.exact,
         caseSensitive: !!a.case_sensitive,
       });
-      if (!found) return text(`(not found: ${JSON.stringify(a.text)}${a.role ? ` role=${a.role}` : ''})`);
+      if (!found)
+        return text(`(not found: ${JSON.stringify(a.text)}${a.role ? ` role=${a.role}` : ''})`);
       const desc = `Found <${found.tag.toLowerCase()}>${found.role ? ` role=${found.role}` : ''} "${found.text}"`;
       const action = a.action || 'info';
       const locator = found.frame.locator(found.selector);
       try {
-        if (action === 'click') { await locator.click(); return text(`${desc} — clicked`); }
-        if (action === 'hover') { await locator.hover(); return text(`${desc} — hovered`); }
-        if (action === 'focus') { await locator.focus(); return text(`${desc} — focused`); }
-        if (action === 'scroll_into_view') { await locator.scrollIntoViewIfNeeded(); return text(`${desc} — scrolled into view`); }
+        if (action === 'click') {
+          await locator.click();
+          return text(`${desc} — clicked`);
+        }
+        if (action === 'hover') {
+          await locator.hover();
+          return text(`${desc} — hovered`);
+        }
+        if (action === 'focus') {
+          await locator.focus();
+          return text(`${desc} — focused`);
+        }
+        if (action === 'scroll_into_view') {
+          await locator.scrollIntoViewIfNeeded();
+          return text(`${desc} — scrolled into view`);
+        }
         return text(desc);
       } finally {
         // Strip the temp marker so repeated finds don't collide
-        await found.frame.evaluate(`(()=>{const el=document.querySelector('[data-browse-find=${JSON.stringify(found.marker)}]');if(el)el.removeAttribute('data-browse-find');})()`).catch(()=>{});
+        await found.frame
+          .evaluate(
+            `(()=>{const el=document.querySelector('[data-browse-find=${JSON.stringify(found.marker)}]');if(el)el.removeAttribute('data-browse-find');})()`,
+          )
+          .catch(() => {});
       }
     },
 
@@ -283,8 +323,15 @@ export const navigation: ToolModule = {
       const page = await browser.getPage();
       const timeout = typeof a.timeout_ms === 'number' ? a.timeout_ms : 10000;
       const found = await waitForText(page, { text: a.text, role: a.role }, timeout);
-      await found.frame.evaluate(`(m)=>{const el=document.querySelector('[data-browse-find="'+m+'"]');if(el)el.removeAttribute('data-browse-find');}`, found.marker).catch(()=>{});
-      return text(`Found <${found.tag.toLowerCase()}>${found.role ? ` role=${found.role}` : ''} "${found.text}"`);
+      await found.frame
+        .evaluate(
+          `(m)=>{const el=document.querySelector('[data-browse-find="'+m+'"]');if(el)el.removeAttribute('data-browse-find');}`,
+          found.marker,
+        )
+        .catch(() => {});
+      return text(
+        `Found <${found.tag.toLowerCase()}>${found.role ? ` role=${found.role}` : ''} "${found.text}"`,
+      );
     },
 
     async browser_eval(a) {

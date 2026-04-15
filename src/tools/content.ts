@@ -13,11 +13,15 @@ export const content: ToolModule = {
       inputSchema: {
         type: 'object',
         properties: {
-          url: { type: 'string', description: 'Optional URL to navigate to first (waitUntil domcontentloaded)' },
+          url: {
+            type: 'string',
+            description: 'Optional URL to navigate to first (waitUntil domcontentloaded)',
+          },
           format: {
             type: 'string',
             enum: ['markdown', 'text', 'json'],
-            description: 'Output format (default: markdown). "text" = textContent only, "json" = raw parsed object.',
+            description:
+              'Output format (default: markdown). "text" = textContent only, "json" = raw parsed object.',
           },
         },
       },
@@ -29,11 +33,21 @@ export const content: ToolModule = {
       inputSchema: {
         type: 'object',
         properties: {
-          href_pattern: { type: 'string', description: 'Substring or /regex/flags literal to match href' },
-          text_pattern: { type: 'string', description: 'Case-insensitive substring to match link text' },
+          href_pattern: {
+            type: 'string',
+            description: 'Substring or /regex/flags literal to match href',
+          },
+          text_pattern: {
+            type: 'string',
+            description: 'Case-insensitive substring to match link text',
+          },
           same_origin_only: { type: 'boolean', description: 'Drop external links (default false)' },
           max: { type: 'number', description: 'Cap result count (default 200)' },
-          include_unlabeled: { type: 'boolean', description: 'Include anchors with no discoverable label (fallback to a slug derived from the href path). Default false — unlabeled anchors are skipped.' },
+          include_unlabeled: {
+            type: 'boolean',
+            description:
+              'Include anchors with no discoverable label (fallback to a slug derived from the href path). Default false — unlabeled anchors are skipped.',
+          },
         },
       },
     },
@@ -46,7 +60,8 @@ export const content: ToolModule = {
         properties: {
           href_pattern: {
             type: 'string',
-            description: 'Filter to anchors whose href contains this substring, OR a /regex/flags literal (e.g. "/\\\\/l\\\\//")',
+            description:
+              'Filter to anchors whose href contains this substring, OR a /regex/flags literal (e.g. "/\\\\/l\\\\//")',
           },
           require_text: {
             type: 'string',
@@ -59,7 +74,8 @@ export const content: ToolModule = {
           group_by: {
             type: 'string',
             enum: ['href', 'row', 'auto'],
-            description: 'Grouping mode. "href" = dedupe by URL (marketplace cards). "row" = detect repeating row container, pick title anchor per row, other anchors -> meta (HN/Reddit/blogs). "auto" (default) tries row, falls back to href.',
+            description:
+              'Grouping mode. "href" = dedupe by URL (marketplace cards). "row" = detect repeating row container, pick title anchor per row, other anchors -> meta (HN/Reddit/blogs). "auto" (default) tries row, falls back to href.',
           },
         },
       },
@@ -73,7 +89,7 @@ export const content: ToolModule = {
       if (!article || (!article.content && !article.textContent)) {
         return text(
           'Readability did not detect an article on this page. Fall back to browser_snapshot for a general accessibility tree.',
-          true
+          true,
         );
       }
       return text(formatArticle(article, format));

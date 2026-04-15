@@ -54,7 +54,9 @@ export async function runAxeAudit(page: Page): Promise<A11yResult> {
 export function formatA11yResult(r: A11yResult): string {
   const lines: string[] = [];
   lines.push(`axe-core audit — ${r.url}`);
-  lines.push(`passes: ${r.passes}  incomplete: ${r.incomplete}  violations: ${r.violations.length}`);
+  lines.push(
+    `passes: ${r.passes}  incomplete: ${r.incomplete}  violations: ${r.violations.length}`,
+  );
   lines.push('');
   if (r.violations.length === 0) {
     lines.push('No violations.');

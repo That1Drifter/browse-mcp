@@ -1,10 +1,7 @@
 #!/usr/bin/env node
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { browser, DEFAULT_DATA_DIR } from './browser.js';
 import { rm } from 'fs/promises';
 import { snapshot, resolveRef } from './snapshot.js';
@@ -31,7 +28,7 @@ import { research } from './research.js';
 
 const server = new Server(
   { name: 'browse-mcp', version: '0.1.0' },
-  { capabilities: { tools: {} } }
+  { capabilities: { tools: {} } },
 );
 
 const tools = [
@@ -59,14 +56,32 @@ const tools = [
       type: 'object',
       properties: {
         full: { type: 'boolean', description: 'Full structural tree (default: interactive-only)' },
-        interactive: { type: 'boolean', description: 'Deprecated — interactive is now default. Ignored when full=true.' },
-        cursor_interactive: { type: 'boolean', description: 'Also include @c refs for non-ARIA clickables (div/span with cursor:pointer). Useful for React apps that skip semantic HTML.' },
+        interactive: {
+          type: 'boolean',
+          description: 'Deprecated — interactive is now default. Ignored when full=true.',
+        },
+        cursor_interactive: {
+          type: 'boolean',
+          description:
+            'Also include @c refs for non-ARIA clickables (div/span with cursor:pointer). Useful for React apps that skip semantic HTML.',
+        },
         max_depth: { type: 'number', description: 'Max tree depth' },
-        selector: { type: 'string', description: 'CSS selector to scope the tree to the subtree rooted at the first match' },
+        selector: {
+          type: 'string',
+          description: 'CSS selector to scope the tree to the subtree rooted at the first match',
+        },
         max_lines: { type: 'number', description: 'Truncate output at N lines (default 500)' },
         diff: { type: 'boolean', description: 'Return diff vs previous snapshot' },
-        clean: { type: 'boolean', description: 'Run cleanup (all categories: ads, cookie banners, sticky bars, social popups) before snapshotting' },
-        no_collapse: { type: 'boolean', description: 'Emit the literal tree without collapsing single-child [generic] wrapper chains (default: collapse enabled)' },
+        clean: {
+          type: 'boolean',
+          description:
+            'Run cleanup (all categories: ads, cookie banners, sticky bars, social popups) before snapshotting',
+        },
+        no_collapse: {
+          type: 'boolean',
+          description:
+            'Emit the literal tree without collapsing single-child [generic] wrapper chains (default: collapse enabled)',
+        },
       },
     },
   },
@@ -124,13 +139,17 @@ const tools = [
   },
   {
     name: 'browser_console',
-    description: 'Get captured browser console messages (log/warn/error/etc). Set clear=true to reset the buffer after reading.',
+    description:
+      'Get captured browser console messages (log/warn/error/etc). Set clear=true to reset the buffer after reading.',
     inputSchema: {
       type: 'object',
       properties: {
         errors_only: { type: 'boolean', description: 'Only error/warning entries' },
         clear: { type: 'boolean', description: 'Clear buffer after reading' },
-        all_tabs: { type: 'boolean', description: 'Include entries from every tab (prefixed with [tab N])' },
+        all_tabs: {
+          type: 'boolean',
+          description: 'Include entries from every tab (prefixed with [tab N])',
+        },
       },
     },
   },
@@ -140,9 +159,15 @@ const tools = [
     inputSchema: {
       type: 'object',
       properties: {
-        failed_only: { type: 'boolean', description: 'Only failed (status >= 400 or no response) requests' },
+        failed_only: {
+          type: 'boolean',
+          description: 'Only failed (status >= 400 or no response) requests',
+        },
         clear: { type: 'boolean', description: 'Clear buffer after reading' },
-        all_tabs: { type: 'boolean', description: 'Include entries from every tab (prefixed with [tab N])' },
+        all_tabs: {
+          type: 'boolean',
+          description: 'Include entries from every tab (prefixed with [tab N])',
+        },
       },
     },
   },
@@ -164,7 +189,8 @@ const tools = [
   },
   {
     name: 'browser_eval',
-    description: 'Run a JavaScript expression in the page context and return the result as a string.',
+    description:
+      'Run a JavaScript expression in the page context and return the result as a string.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -211,7 +237,10 @@ const tools = [
       type: 'object',
       properties: {
         selector: { type: 'string', description: 'CSS selector or @ref of the element to inspect' },
-        include_user_agent: { type: 'boolean', description: 'Include user-agent stylesheet rules (default: false)' },
+        include_user_agent: {
+          type: 'boolean',
+          description: 'Include user-agent stylesheet rules (default: false)',
+        },
       },
       required: ['selector'],
     },
@@ -223,8 +252,15 @@ const tools = [
     inputSchema: {
       type: 'object',
       properties: {
-        text: { type: 'string', description: 'Text to search for (matches aria-label, title, placeholder, or textContent)' },
-        role: { type: 'string', description: 'Optional role/tag filter: button, link, textbox, heading' },
+        text: {
+          type: 'string',
+          description:
+            'Text to search for (matches aria-label, title, placeholder, or textContent)',
+        },
+        role: {
+          type: 'string',
+          description: 'Optional role/tag filter: button, link, textbox, heading',
+        },
         exact: { type: 'boolean', description: 'Exact match (default: substring)' },
         case_sensitive: { type: 'boolean', description: 'Case-sensitive match (default: false)' },
         action: {
@@ -259,7 +295,8 @@ const tools = [
       properties: {
         href_pattern: {
           type: 'string',
-          description: 'Filter to anchors whose href contains this substring, OR a /regex/flags literal (e.g. "/\\\\/l\\\\//")',
+          description:
+            'Filter to anchors whose href contains this substring, OR a /regex/flags literal (e.g. "/\\\\/l\\\\//")',
         },
         require_text: {
           type: 'string',
@@ -272,7 +309,8 @@ const tools = [
         group_by: {
           type: 'string',
           enum: ['href', 'row', 'auto'],
-          description: 'Grouping mode. "href" = dedupe by URL (marketplace cards). "row" = detect repeating row container, pick title anchor per row, other anchors -> meta (HN/Reddit/blogs). "auto" (default) tries row, falls back to href.',
+          description:
+            'Grouping mode. "href" = dedupe by URL (marketplace cards). "row" = detect repeating row container, pick title anchor per row, other anchors -> meta (HN/Reddit/blogs). "auto" (default) tries row, falls back to href.',
         },
       },
     },
@@ -285,10 +323,14 @@ const tools = [
       type: 'object',
       properties: {
         url: { type: 'string', description: 'URL to download' },
-        save_dir: { type: 'string', description: 'Optional directory (default: ~/.browse-mcp/downloads)' },
+        save_dir: {
+          type: 'string',
+          description: 'Optional directory (default: ~/.browse-mcp/downloads)',
+        },
         force_fetch: {
           type: 'boolean',
-          description: 'If the page does not trigger a download within ~3s, fall back to a raw fetch() of the URL (default false).',
+          description:
+            'If the page does not trigger a download within ~3s, fall back to a raw fetch() of the URL (default false).',
         },
       },
       required: ['url'],
@@ -296,7 +338,8 @@ const tools = [
   },
   {
     name: 'browser_hover',
-    description: 'Hover over an element (by @ref or selector) to trigger hover states, menus, tooltips.',
+    description:
+      'Hover over an element (by @ref or selector) to trigger hover states, menus, tooltips.',
     inputSchema: {
       type: 'object',
       properties: { target: { type: 'string', description: '@ref or CSS selector' } },
@@ -311,7 +354,11 @@ const tools = [
       type: 'object',
       properties: {
         target: { type: 'string', description: '@ref or CSS selector to scroll into view' },
-        to: { type: 'string', enum: ['top', 'bottom'], description: 'Scroll to top or bottom of page' },
+        to: {
+          type: 'string',
+          enum: ['top', 'bottom'],
+          description: 'Scroll to top or bottom of page',
+        },
       },
     },
   },
@@ -343,7 +390,10 @@ const tools = [
     inputSchema: {
       type: 'object',
       properties: {
-        selector: { type: 'string', description: 'CSS selector (not @ref — applies to all matches)' },
+        selector: {
+          type: 'string',
+          description: 'CSS selector (not @ref — applies to all matches)',
+        },
         property: { type: 'string', description: 'CSS property name (e.g. "background-color")' },
         value: { type: 'string', description: 'CSS value (e.g. "#1a1a1a" or "20px")' },
         important: { type: 'boolean', description: 'Add !important (default false)' },
@@ -353,12 +403,16 @@ const tools = [
   },
   {
     name: 'browser_undo_style',
-    description: 'Undo the last N style modifications (default 1). Pass count to undo multiple at once.',
+    description:
+      'Undo the last N style modifications (default 1). Pass count to undo multiple at once.',
     inputSchema: {
       type: 'object',
       properties: {
         count: { type: 'number', description: 'How many changes to undo (default 1)' },
-        show_history: { type: 'boolean', description: 'Just list the current undo stack without undoing' },
+        show_history: {
+          type: 'boolean',
+          description: 'Just list the current undo stack without undoing',
+        },
       },
     },
   },
@@ -401,11 +455,15 @@ const tools = [
     inputSchema: {
       type: 'object',
       properties: {
-        url: { type: 'string', description: 'Optional URL to navigate to first (waitUntil domcontentloaded)' },
+        url: {
+          type: 'string',
+          description: 'Optional URL to navigate to first (waitUntil domcontentloaded)',
+        },
         format: {
           type: 'string',
           enum: ['markdown', 'text', 'json'],
-          description: 'Output format (default: markdown). "text" = textContent only, "json" = raw parsed object.',
+          description:
+            'Output format (default: markdown). "text" = textContent only, "json" = raw parsed object.',
         },
       },
     },
@@ -417,11 +475,21 @@ const tools = [
     inputSchema: {
       type: 'object',
       properties: {
-        href_pattern: { type: 'string', description: 'Substring or /regex/flags literal to match href' },
-        text_pattern: { type: 'string', description: 'Case-insensitive substring to match link text' },
+        href_pattern: {
+          type: 'string',
+          description: 'Substring or /regex/flags literal to match href',
+        },
+        text_pattern: {
+          type: 'string',
+          description: 'Case-insensitive substring to match link text',
+        },
         same_origin_only: { type: 'boolean', description: 'Drop external links (default false)' },
         max: { type: 'number', description: 'Cap result count (default 200)' },
-        include_unlabeled: { type: 'boolean', description: 'Include anchors with no discoverable label (fallback to a slug derived from the href path). Default false — unlabeled anchors are skipped.' },
+        include_unlabeled: {
+          type: 'boolean',
+          description:
+            'Include anchors with no discoverable label (fallback to a slug derived from the href path). Default false — unlabeled anchors are skipped.',
+        },
       },
     },
   },
@@ -512,7 +580,10 @@ const tools = [
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Research query' },
-        max_results: { type: 'number', description: 'Number of top search results to read (default 5)' },
+        max_results: {
+          type: 'number',
+          description: 'Number of top search results to read (default 5)',
+        },
         region: { type: 'string', description: 'DDG region code, e.g. "us-en"' },
         format: {
           type: 'string',
@@ -530,19 +601,49 @@ const tools = [
 // cut the ~5K-token schema payload when their MCP client loads everything
 // up front. Default: expose all tools.
 const TOOL_BUNDLES: Record<string, string[]> = {
-  core: ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type', 'browser_press_key', 'browser_wait_for', 'browser_eval', 'browser_close'],
+  core: [
+    'browser_navigate',
+    'browser_snapshot',
+    'browser_click',
+    'browser_type',
+    'browser_press_key',
+    'browser_wait_for',
+    'browser_eval',
+    'browser_close',
+  ],
   search: ['browser_search', 'browser_search_news', 'browser_search_images', 'browser_research'],
   content: ['browser_read', 'browser_links', 'browser_extract_listings'],
   visual: ['browser_screenshot', 'browser_screenshot_annotated', 'browser_responsive'],
-  debug: ['browser_console', 'browser_network', 'browser_a11y_audit', 'browser_inspect_css', 'browser_report_difficulty', 'browser_review_issues'],
+  debug: [
+    'browser_console',
+    'browser_network',
+    'browser_a11y_audit',
+    'browser_inspect_css',
+    'browser_report_difficulty',
+    'browser_review_issues',
+  ],
   edit: ['browser_modify_style', 'browser_undo_style', 'browser_cleanup'],
-  session: ['browser_tabs', 'browser_switch_tab', 'browser_handoff', 'browser_resume', 'browser_download', 'browser_reset_profile', 'browser_hover', 'browser_scroll', 'browser_find_text', 'browser_wait_for_text'],
+  session: [
+    'browser_tabs',
+    'browser_switch_tab',
+    'browser_handoff',
+    'browser_resume',
+    'browser_download',
+    'browser_reset_profile',
+    'browser_hover',
+    'browser_scroll',
+    'browser_find_text',
+    'browser_wait_for_text',
+  ],
 };
 function filterTools(all: typeof tools): typeof tools {
   const raw = process.env.BROWSE_MCP_TOOLS;
   if (!raw) return all;
   const allowed = new Set<string>();
-  for (const tok of raw.split(',').map((s) => s.trim()).filter(Boolean)) {
+  for (const tok of raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)) {
     if (TOOL_BUNDLES[tok]) for (const n of TOOL_BUNDLES[tok]) allowed.add(n);
     else allowed.add(tok);
   }
@@ -563,7 +664,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (typeof url === 'string' && /\.pdf(\?.*)?$/i.test(url)) {
           const result = await downloadUrl(page, url);
           return text(
-            `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). Use browser_download to fetch directly next time.`
+            `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). Use browser_download to fetch directly next time.`,
           );
         }
         try {
@@ -572,7 +673,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           if (/download is starting/i.test(e?.message || '')) {
             const result = await downloadUrl(page, url);
             return text(
-              `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). Use browser_download to fetch directly next time.`
+              `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). Use browser_download to fetch directly next time.`,
             );
           }
           throw e;
@@ -580,12 +681,20 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         let msg = `Navigated to ${page.url()}`;
         try {
           const currentUrl = page.url();
-          const urlHit = /\/static-pages\/418|\/cdn-cgi\/|\/distil_r_captcha|\/_recaptcha/i.test(currentUrl);
+          const urlHit = /\/static-pages\/418|\/cdn-cgi\/|\/distil_r_captcha|\/_recaptcha/i.test(
+            currentUrl,
+          );
           const bodyHit = await Promise.race([
             page.evaluate(() => {
               const t = (document.body?.innerText || '').toLowerCase();
               const title = (document.title || '').toLowerCase();
-              const needles = ['checking your browser', 'verify you are human', 'captcha', 'cloudflare', 'challenge'];
+              const needles = [
+                'checking your browser',
+                'verify you are human',
+                'captcha',
+                'cloudflare',
+                'challenge',
+              ];
               return needles.some((n) => t.includes(n) || title.includes(n));
             }),
             new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 300)),
@@ -593,13 +702,15 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           if (urlHit || bodyHit) {
             msg += `\n\n[heads-up] Looks like a bot-detection / CAPTCHA interstitial. Consider browser_handoff to let the user solve it interactively.`;
           }
-        } catch { /* silent */ }
+        } catch {
+          /* silent */
+        }
         return text(msg);
       }
 
       case 'browser_snapshot': {
         const page = await browser.getPage();
-        const interactiveOnly = a.full ? false : (a.interactive !== false);
+        const interactiveOnly = a.full ? false : a.interactive !== false;
         const maxLines = typeof a.max_lines === 'number' ? a.max_lines : 500;
         if (a.clean) {
           await cleanup(page, { all: true });
@@ -615,7 +726,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (lines.length > maxLines) {
           const kept = lines.slice(0, maxLines);
           const dropped = lines.length - maxLines;
-          tree = kept.join('\n') + `\n\n[... truncated ${dropped} more lines. Re-call with selector="<css>" to scope, or max_lines=<N> to expand.]`;
+          tree =
+            kept.join('\n') +
+            `\n\n[... truncated ${dropped} more lines. Re-call with selector="<css>" to scope, or max_lines=<N> to expand.]`;
         }
         if (a.diff) {
           const prev = browser.lastSnapshot;
@@ -679,11 +792,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'browser_console': {
         await browser.getPage();
         let entries = a.all_tabs ? browser.getAllConsoleLogs() : browser.consoleLog;
-        if (a.errors_only) entries = entries.filter((e) => e.type === 'error' || e.type === 'warning');
-        const out = entries.map((e) => {
-          const prefix = a.all_tabs ? `[tab ${e.tabIndex ?? '?'}] ` : '';
-          return `${prefix}[${e.type}] ${e.text}${e.location ? ` (${e.location})` : ''}`;
-        }).join('\n');
+        if (a.errors_only)
+          entries = entries.filter((e) => e.type === 'error' || e.type === 'warning');
+        const out = entries
+          .map((e) => {
+            const prefix = a.all_tabs ? `[tab ${e.tabIndex ?? '?'}] ` : '';
+            return `${prefix}[${e.type}] ${e.text}${e.location ? ` (${e.location})` : ''}`;
+          })
+          .join('\n');
         if (a.clear) browser.clearConsole();
         return text(out || '(no console messages)');
       }
@@ -691,11 +807,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'browser_network': {
         await browser.getPage();
         let entries = a.all_tabs ? browser.getAllNetworkLogs() : browser.networkLog;
-        if (a.failed_only) entries = entries.filter((e) => e.status === undefined || (e.status && e.status >= 400));
-        const out = entries.map((e) => {
-          const prefix = a.all_tabs ? `[tab ${e.tabIndex ?? '?'}] ` : '';
-          return `${prefix}${e.method} ${e.status ?? 'pending'} ${e.url}`;
-        }).join('\n');
+        if (a.failed_only)
+          entries = entries.filter((e) => e.status === undefined || (e.status && e.status >= 400));
+        const out = entries
+          .map((e) => {
+            const prefix = a.all_tabs ? `[tab ${e.tabIndex ?? '?'}] ` : '';
+            return `${prefix}${e.method} ${e.status ?? 'pending'} ${e.url}`;
+          })
+          .join('\n');
         if (a.clear) browser.clearNetwork();
         return text(out || '(no network activity)');
       }
@@ -746,19 +865,36 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           exact: !!a.exact,
           caseSensitive: !!a.case_sensitive,
         });
-        if (!found) return text(`(not found: ${JSON.stringify(a.text)}${a.role ? ` role=${a.role}` : ''})`);
+        if (!found)
+          return text(`(not found: ${JSON.stringify(a.text)}${a.role ? ` role=${a.role}` : ''})`);
         const desc = `Found <${found.tag.toLowerCase()}>${found.role ? ` role=${found.role}` : ''} "${found.text}"`;
         const action = a.action || 'info';
         const locator = found.frame.locator(found.selector);
         try {
-          if (action === 'click') { await locator.click(); return text(`${desc} — clicked`); }
-          if (action === 'hover') { await locator.hover(); return text(`${desc} — hovered`); }
-          if (action === 'focus') { await locator.focus(); return text(`${desc} — focused`); }
-          if (action === 'scroll_into_view') { await locator.scrollIntoViewIfNeeded(); return text(`${desc} — scrolled into view`); }
+          if (action === 'click') {
+            await locator.click();
+            return text(`${desc} — clicked`);
+          }
+          if (action === 'hover') {
+            await locator.hover();
+            return text(`${desc} — hovered`);
+          }
+          if (action === 'focus') {
+            await locator.focus();
+            return text(`${desc} — focused`);
+          }
+          if (action === 'scroll_into_view') {
+            await locator.scrollIntoViewIfNeeded();
+            return text(`${desc} — scrolled into view`);
+          }
           return text(desc);
         } finally {
           // Strip the temp marker so repeated finds don't collide
-          await found.frame.evaluate(`(()=>{const el=document.querySelector('[data-browse-find=${JSON.stringify(found.marker)}]');if(el)el.removeAttribute('data-browse-find');})()`).catch(()=>{});
+          await found.frame
+            .evaluate(
+              `(()=>{const el=document.querySelector('[data-browse-find=${JSON.stringify(found.marker)}]');if(el)el.removeAttribute('data-browse-find');})()`,
+            )
+            .catch(() => {});
         }
       }
 
@@ -766,8 +902,15 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const page = await browser.getPage();
         const timeout = typeof a.timeout_ms === 'number' ? a.timeout_ms : 10000;
         const found = await waitForText(page, { text: a.text, role: a.role }, timeout);
-        await found.frame.evaluate(`(m)=>{const el=document.querySelector('[data-browse-find="'+m+'"]');if(el)el.removeAttribute('data-browse-find');}`, found.marker).catch(()=>{});
-        return text(`Found <${found.tag.toLowerCase()}>${found.role ? ` role=${found.role}` : ''} "${found.text}"`);
+        await found.frame
+          .evaluate(
+            `(m)=>{const el=document.querySelector('[data-browse-find="'+m+'"]');if(el)el.removeAttribute('data-browse-find');}`,
+            found.marker,
+          )
+          .catch(() => {});
+        return text(
+          `Found <${found.tag.toLowerCase()}>${found.role ? ` role=${found.role}` : ''} "${found.text}"`,
+        );
       }
 
       case 'browser_extract_listings': {
@@ -783,9 +926,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
       case 'browser_download': {
         const page = await browser.getPage();
-        const result = await downloadUrl(page, a.url, { saveDir: a.save_dir, forceFetch: !!a.force_fetch });
+        const result = await downloadUrl(page, a.url, {
+          saveDir: a.save_dir,
+          forceFetch: !!a.force_fetch,
+        });
         return text(
-          `Downloaded ${result.filename}\n  path: ${result.path}\n  size: ${result.sizeBytes} bytes\n  from: ${result.url}`
+          `Downloaded ${result.filename}\n  path: ${result.path}\n  size: ${result.sizeBytes} bytes\n  from: ${result.url}`,
         );
       }
 
@@ -822,9 +968,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'browser_responsive': {
         const page = await browser.getPage();
         const viewports = [
-          { label: 'mobile',  w: 375,  h: 812  },
-          { label: 'tablet',  w: 768,  h: 1024 },
-          { label: 'desktop', w: 1280, h: 720  },
+          { label: 'mobile', w: 375, h: 812 },
+          { label: 'tablet', w: 768, h: 1024 },
+          { label: 'desktop', w: 1280, h: 720 },
         ];
         const images: Array<{ label: string; buf: Buffer }> = [];
         const original = page.viewportSize();
@@ -861,7 +1007,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         const change = await applyStyle(page, a.selector, a.property, a.value, !!a.important);
         return text(
           `#${change.id} set ${change.property}=${change.newValue}${change.important ? ' !important' : ''} on ${change.matchCount} element(s). ` +
-          `Previous: ${change.previousValue || '(unset)'}. Undo with browser_undo_style.`
+            `Previous: ${change.previousValue || '(unset)'}. Undo with browser_undo_style.`,
         );
       }
 
@@ -870,14 +1016,21 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           const h = styleHistory();
           if (h.length === 0) return text('(undo stack empty)');
           return text(
-            h.map((c) => `#${c.id} ${c.selector} { ${c.property}: ${c.newValue}${c.important ? ' !important' : ''}; } (prev: ${c.previousValue || '(unset)'})`).join('\n')
+            h
+              .map(
+                (c) =>
+                  `#${c.id} ${c.selector} { ${c.property}: ${c.newValue}${c.important ? ' !important' : ''}; } (prev: ${c.previousValue || '(unset)'})`,
+              )
+              .join('\n'),
           );
         }
         const page = await browser.getPage();
         const count = typeof a.count === 'number' ? a.count : 1;
         const undone = await undoStyle(page, count);
         if (undone.length === 0) return text('(nothing to undo)');
-        return text(`Undid ${undone.length} change(s): ${undone.map((c) => `#${c.id}`).join(', ')}`);
+        return text(
+          `Undid ${undone.length} change(s): ${undone.map((c) => `#${c.id}`).join(', ')}`,
+        );
       }
 
       case 'browser_handoff': {
@@ -886,8 +1039,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         await browser.switchMode('headed', url, a.reason || 'handoff');
         return text(
           `Visible Chrome window opened at ${url}. Reason: ${a.reason || '(unspecified)'}. ` +
-          `Cookies/localStorage/auth persist across sessions via the profile at ~/.browse-mcp/chromium-profile/, so OAuth/MFA/CAPTCHA typically only needs to be completed once per service. ` +
-          `Ask the user to complete the task, then call browser_resume.`
+            `Cookies/localStorage/auth persist across sessions via the profile at ~/.browse-mcp/chromium-profile/, so OAuth/MFA/CAPTCHA typically only needs to be completed once per service. ` +
+            `Ask the user to complete the task, then call browser_resume.`,
         );
       }
 
@@ -896,7 +1049,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
           try {
             const p = (browser as any).page;
             return p && !p.isClosed() ? p.url() : undefined;
-          } catch { return undefined; }
+          } catch {
+            return undefined;
+          }
         })();
         await browser.switchMode('headless', currentUrl);
         const page = await browser.getPage();
@@ -929,9 +1084,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (slice.length === 0) return text('(no issues logged yet)');
         const lines = slice.map((i) => {
           const head = `[${i.ts}] ${i.kind}${i.tool ? ` ${i.tool}` : ''}`;
-          const body = i.kind === 'error'
-            ? `  error: ${i.error}${i.args ? `\n  args: ${JSON.stringify(i.args)}` : ''}${i.url ? `\n  url: ${i.url}` : ''}`
-            : `  note: ${i.note}${i.context ? `\n  context: ${JSON.stringify(i.context)}` : ''}${i.url ? `\n  url: ${i.url}` : ''}`;
+          const body =
+            i.kind === 'error'
+              ? `  error: ${i.error}${i.args ? `\n  args: ${JSON.stringify(i.args)}` : ''}${i.url ? `\n  url: ${i.url}` : ''}`
+              : `  note: ${i.note}${i.context ? `\n  context: ${JSON.stringify(i.context)}` : ''}${i.url ? `\n  url: ${i.url}` : ''}`;
           return `${head}\n${body}`;
         });
         return text(lines.join('\n\n') + `\n\n(source: ${logPath()})`);
@@ -944,7 +1100,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         if (!article || (!article.content && !article.textContent)) {
           return text(
             'Readability did not detect an article on this page. Fall back to browser_snapshot for a general accessibility tree.',
-            true
+            true,
           );
         }
         return text(formatArticle(article, format));
@@ -985,7 +1141,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
             url: p.url(),
             title: await p.title().catch(() => ''),
             active: p === active,
-          }))
+          })),
         );
         return text(JSON.stringify(list, null, 2));
       }
@@ -1006,14 +1162,16 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'browser_reset_profile': {
         if (browser.isEphemeral()) {
           await browser.close();
-          return text('Ephemeral mode (BROWSE_MCP_EPHEMERAL=1): no persistent profile to delete. Browser closed; next call starts a fresh context.');
+          return text(
+            'Ephemeral mode (BROWSE_MCP_EPHEMERAL=1): no persistent profile to delete. Browser closed; next call starts a fresh context.',
+          );
         }
         if (a.confirm !== true) {
           return text(
             'browser_reset_profile destructively deletes the persistent Chromium profile ' +
-            `(at ${DEFAULT_DATA_DIR}), clearing all cookies, localStorage, saved auth, and cache. ` +
-            'This cannot be undone. Re-call with confirm: true to proceed.',
-            true
+              `(at ${DEFAULT_DATA_DIR}), clearing all cookies, localStorage, saved auth, and cache. ` +
+              'This cannot be undone. Re-call with confirm: true to proceed.',
+            true,
           );
         }
         await browser.close();
@@ -1054,7 +1212,9 @@ async function currentUrl(): Promise<string | undefined> {
     // @ts-ignore — reach into manager without forcing a launch
     const page = (browser as any).page;
     if (page && !page.isClosed()) return page.url();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return undefined;
 }
 

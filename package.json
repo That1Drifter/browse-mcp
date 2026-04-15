@@ -43,7 +43,10 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint \"src/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\""
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
@@ -53,8 +56,13 @@
     "sharp": "^0.33.5"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.0.0",
+    "eslint": "^10.2.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.3",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.58.2",
     "vitest": "^4.1.4"
   }
 }

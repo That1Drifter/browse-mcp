@@ -70,7 +70,7 @@ function braveKey(): string | undefined {
 export async function duckDuckGoSearch(
   query: string,
   maxResults = 10,
-  region?: string
+  region?: string,
 ): Promise<SearchResult[]> {
   // Opt-in: Brave Search API first when a key is configured. Falls through
   // to DDG/Bing scrape on any Brave failure.
@@ -97,9 +97,9 @@ export async function duckDuckGoSearch(
       headers: {
         'User-Agent': UA,
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'text/html,application/xhtml+xml',
+        Accept: 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://html.duckduckgo.com/',
+        Referer: 'https://html.duckduckgo.com/',
       },
       body: body.toString(),
     });
@@ -122,16 +122,18 @@ export async function duckDuckGoSearch(
     try {
       const bing = await bingSearch(query, maxResults);
       if (bing.length > 0) return bing;
-      throw new Error(`Both DDG and Bing returned 0 results. The scraped HTML layouts may have changed. ` +
-        `Original DDG error: ${(err as Error).message}. ` +
-        `Set BROWSE_MCP_BRAVE_API_KEY for a supported API-based fallback.`);
+      throw new Error(
+        `Both DDG and Bing returned 0 results. The scraped HTML layouts may have changed. ` +
+          `Original DDG error: ${(err as Error).message}. ` +
+          `Set BROWSE_MCP_BRAVE_API_KEY for a supported API-based fallback.`,
+      );
     } catch (bingErr) {
       // Re-throw a combined error so the agent sees both causes.
       throw new Error(
         `Search failed on all providers. DDG: ${(err as Error).message}; ` +
-        `Bing: ${(bingErr as Error).message}. ` +
-        `These providers use unofficial HTML endpoints and may have changed layout. ` +
-        `Set BROWSE_MCP_BRAVE_API_KEY for a supported API-based fallback.`
+          `Bing: ${(bingErr as Error).message}. ` +
+          `These providers use unofficial HTML endpoints and may have changed layout. ` +
+          `Set BROWSE_MCP_BRAVE_API_KEY for a supported API-based fallback.`,
       );
     }
   }
@@ -140,7 +142,7 @@ export async function duckDuckGoSearch(
 export async function duckDuckGoNewsSearch(
   query: string,
   maxResults = 10,
-  region?: string
+  region?: string,
 ): Promise<NewsResult[]> {
   // The html.duckduckgo.com endpoint does not return timestamped news blocks
   // (same result__* layout, no dates), so use the JSON news.js endpoint which
@@ -158,9 +160,9 @@ export async function duckDuckGoNewsSearch(
     const res = await fetch(u.toString(), {
       headers: {
         'User-Agent': UA,
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        Accept: 'application/json, text/javascript, */*; q=0.01',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://duckduckgo.com/',
+        Referer: 'https://duckduckgo.com/',
         'X-Requested-With': 'XMLHttpRequest',
       },
     });
@@ -170,7 +172,9 @@ export async function duckDuckGoNewsSearch(
     try {
       data = JSON.parse(text);
     } catch {
-      throw new Error(`DuckDuckGo news: non-JSON response (len=${text.length}) — endpoint layout may have changed`);
+      throw new Error(
+        `DuckDuckGo news: non-JSON response (len=${text.length}) — endpoint layout may have changed`,
+      );
     }
     const out: NewsResult[] = [];
     for (const r of data.results || []) {
@@ -188,15 +192,18 @@ export async function duckDuckGoNewsSearch(
         kind: 'difficulty',
         tool: 'browser_search_news',
         note: `DDG news parser ${DDG_NEWS_PARSER_VERSION} returned 0 results — JSON shape may have changed`,
-        context: { rawResults: Array.isArray(data.results) ? data.results.length : 'missing', query },
+        context: {
+          rawResults: Array.isArray(data.results) ? data.results.length : 'missing',
+          query,
+        },
       });
     }
     return out;
   } catch (err) {
     throw new Error(
       `News search failed: ${(err as Error).message}. ` +
-      `This uses an unofficial DDG JSON endpoint that can break when the site changes. ` +
-      `No stable free news-API fallback is wired in; consider browser_search with the query + "news".`
+        `This uses an unofficial DDG JSON endpoint that can break when the site changes. ` +
+        `No stable free news-API fallback is wired in; consider browser_search with the query + "news".`,
     );
   }
 }
@@ -204,7 +211,7 @@ export async function duckDuckGoNewsSearch(
 export async function duckDuckGoImageSearch(
   query: string,
   maxResults = 20,
-  safeSearch: 'strict' | 'moderate' | 'off' = 'moderate'
+  safeSearch: 'strict' | 'moderate' | 'off' = 'moderate',
 ): Promise<ImageResult[]> {
   // Parser version: see DDG_IMAGES_PARSER_VERSION above.
   try {
@@ -220,9 +227,9 @@ export async function duckDuckGoImageSearch(
     const res = await fetch(u.toString(), {
       headers: {
         'User-Agent': UA,
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        Accept: 'application/json, text/javascript, */*; q=0.01',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://duckduckgo.com/',
+        Referer: 'https://duckduckgo.com/',
         'X-Requested-With': 'XMLHttpRequest',
       },
     });
@@ -232,7 +239,9 @@ export async function duckDuckGoImageSearch(
     try {
       data = JSON.parse(text);
     } catch {
-      throw new Error(`DuckDuckGo images: non-JSON response (len=${text.length}) — endpoint layout may have changed`);
+      throw new Error(
+        `DuckDuckGo images: non-JSON response (len=${text.length}) — endpoint layout may have changed`,
+      );
     }
     const out: ImageResult[] = [];
     for (const r of data.results || []) {
@@ -252,14 +261,17 @@ export async function duckDuckGoImageSearch(
         kind: 'difficulty',
         tool: 'browser_search_images',
         note: `DDG images parser ${DDG_IMAGES_PARSER_VERSION} returned 0 results — JSON shape may have changed`,
-        context: { rawResults: Array.isArray(data.results) ? data.results.length : 'missing', query },
+        context: {
+          rawResults: Array.isArray(data.results) ? data.results.length : 'missing',
+          query,
+        },
       });
     }
     return out;
   } catch (err) {
     throw new Error(
       `Image search failed: ${(err as Error).message}. ` +
-      `This uses an unofficial DDG JSON endpoint (needs a vqd token) that can break when the site changes.`
+        `This uses an unofficial DDG JSON endpoint (needs a vqd token) that can break when the site changes.`,
     );
   }
 }
@@ -268,13 +280,17 @@ export async function duckDuckGoImageSearch(
 // Free tier: 1 req/s, 2000/mo. Docs: https://api.search.brave.com/app/documentation
 // Triggered only when BROWSE_MCP_BRAVE_API_KEY is set.
 
-async function braveSearch(query: string, maxResults: number, key: string): Promise<SearchResult[]> {
+async function braveSearch(
+  query: string,
+  maxResults: number,
+  key: string,
+): Promise<SearchResult[]> {
   const u = new URL('https://api.search.brave.com/res/v1/web/search');
   u.searchParams.set('q', query);
   u.searchParams.set('count', String(Math.min(maxResults, 20)));
   const res = await fetch(u.toString(), {
     headers: {
-      'Accept': 'application/json',
+      Accept: 'application/json',
       'Accept-Encoding': 'gzip',
       'X-Subscription-Token': key,
     },
@@ -303,7 +319,7 @@ async function getVqd(query: string): Promise<string> {
   const res = await fetch(u, {
     headers: {
       'User-Agent': UA,
-      'Accept': 'text/html,application/xhtml+xml',
+      Accept: 'text/html,application/xhtml+xml',
       'Accept-Language': 'en-US,en;q=0.9',
     },
   });
@@ -315,7 +331,9 @@ async function getVqd(query: string): Promise<string> {
     html.match(/vqd=([\d-]{10,})/) ||
     html.match(/&vqd=([\d-]+)/);
   if (!m || !m[1]) {
-    throw new Error('Failed to extract vqd token from DuckDuckGo — the site layout may have changed.');
+    throw new Error(
+      'Failed to extract vqd token from DuckDuckGo — the site layout may have changed.',
+    );
   }
   return m[1];
 }
@@ -325,9 +343,9 @@ async function bingSearch(query: string, maxResults: number): Promise<SearchResu
   const res = await fetch(u, {
     headers: {
       'User-Agent': UA,
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.9',
-      'Referer': 'https://www.bing.com/',
+      Referer: 'https://www.bing.com/',
     },
   });
   if (!res.ok) throw new Error(`Bing HTTP ${res.status}`);
@@ -389,7 +407,9 @@ export function unwrapBingRedirect(href: string): string {
         try {
           const decoded = Buffer.from(b64 + pad, 'base64').toString('utf8');
           if (/^https?:\/\//i.test(decoded)) return decoded;
-        } catch { /* fall through */ }
+        } catch {
+          /* fall through */
+        }
       }
     }
     return u.toString();
@@ -417,8 +437,9 @@ export function parseResults(html: string, max: number): SearchResult[] {
 
     // Look ahead up to 4KB for this result's snippet.
     const tail = html.slice(m.index + m[0].length, m.index + m[0].length + 4000);
-    const snipMatch =
-      tail.match(/<(?:a|div)[^>]*\bclass="[^"]*\bresult__snippet\b[^"]*"[^>]*>([\s\S]*?)<\/(?:a|div)>/);
+    const snipMatch = tail.match(
+      /<(?:a|div)[^>]*\bclass="[^"]*\bresult__snippet\b[^"]*"[^>]*>([\s\S]*?)<\/(?:a|div)>/,
+    );
     const snippet = snipMatch ? stripTags(snipMatch[1]).trim() : '';
 
     out.push({ title, url, snippet });
@@ -460,9 +481,7 @@ export function decodeEntities(s: string): string {
 
 export function formatResults(results: SearchResult[]): string {
   if (results.length === 0) return '(no results)';
-  return results
-    .map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`)
-    .join('\n\n');
+  return results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`).join('\n\n');
 }
 
 export function formatNewsResults(results: NewsResult[]): string {

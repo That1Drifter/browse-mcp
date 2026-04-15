@@ -215,10 +215,14 @@ interface FrameData {
   result: FrameResult;
 }
 
-async function runInFrame(frame: Frame, framePrefix: string, scopeSelector?: string): Promise<FrameData | null> {
+async function runInFrame(
+  frame: Frame,
+  framePrefix: string,
+  scopeSelector?: string,
+): Promise<FrameData | null> {
   try {
     const args = `${JSON.stringify(framePrefix)}, ${JSON.stringify(scopeSelector || '')}`;
-    const result = await frame.evaluate(`(${PAGE_FN})(${args})`) as FrameResult;
+    const result = (await frame.evaluate(`(${PAGE_FN})(${args})`)) as FrameResult;
     return { framePrefix, frame, url: frame.url(), result };
   } catch {
     return null;
@@ -247,7 +251,8 @@ function isCursorRef(ref: string | undefined): boolean {
 
 // Defense-in-depth: if a [generic] node's "name" still looks like inline
 // script/CSS source (e.g. leaked via shadow DOM or unusual markup), drop it.
-const CODE_LIKE_RE = /^(\(function|function\s*\(|!function|var\s|let\s|const\s|window\.|document\.|@media|@keyframes|@import|@font-face|body\s*\{|html\s*\{|\.[\w-]+\s*\{|#[\w-]+\s*\{|\/\*)/;
+const CODE_LIKE_RE =
+  /^(\(function|function\s*\(|!function|var\s|let\s|const\s|window\.|document\.|@media|@keyframes|@import|@font-face|body\s*\{|html\s*\{|\.[\w-]+\s*\{|#[\w-]+\s*\{|\/\*)/;
 function isNoisyName(role: string, name: string): boolean {
   if (role !== 'generic' || !name) return false;
   if (CODE_LIKE_RE.test(name)) return true;
@@ -283,7 +288,8 @@ function isCollapsibleGeneric(node: any): boolean {
   if (!node.children || node.children.length !== 1) return false;
   const child = node.children[0];
   if (!child) return false;
-  const cleanName = node.name && !isNoisyName(node.role, String(node.name)) ? String(node.name).trim() : '';
+  const cleanName =
+    node.name && !isNoisyName(node.role, String(node.name)) ? String(node.name).trim() : '';
   if (!cleanName) return true;
   // Name bubbles up from descendants — if our name matches the sole child's
   // name (or its name, trimmed), the wrapper is redundant.
@@ -294,8 +300,13 @@ function isCollapsibleGeneric(node: any): boolean {
 
 export function renderTree(
   node: any,
-  opts: { interactive?: boolean; maxDepth?: number; cursorInteractive?: boolean; noCollapse?: boolean } = {},
-  depth = 0
+  opts: {
+    interactive?: boolean;
+    maxDepth?: number;
+    cursorInteractive?: boolean;
+    noCollapse?: boolean;
+  } = {},
+  depth = 0,
 ): string {
   if (!node) return '';
   // Collapse chains of single-child generic wrappers: walk down until we
@@ -309,12 +320,17 @@ export function renderTree(
   // Hide @c refs unless cursorInteractive is enabled
   const refIsCursor = isCursorRef(node.ref);
   const effectivelyInteractive = node.interactive && (!refIsCursor || opts.cursorInteractive);
-  const showThis = !opts.interactive || effectivelyInteractive || (node.role === 'heading') || hasInteractiveDescendant(node, opts.cursorInteractive);
+  const showThis =
+    !opts.interactive ||
+    effectivelyInteractive ||
+    node.role === 'heading' ||
+    hasInteractiveDescendant(node, opts.cursorInteractive);
 
   if (showThis) {
     const indent = '  '.repeat(depth);
     const refStr = node.ref ? `@${node.ref} ` : '';
-    const cleanName = node.name && !isNoisyName(node.role, String(node.name)) ? String(node.name) : '';
+    const cleanName =
+      node.name && !isNoisyName(node.role, String(node.name)) ? String(node.name) : '';
     const nameStr = cleanName ? ` "${cleanName.replace(/\s+/g, ' ').slice(0, 80)}"` : '';
     const levelAttr = typeof node.tag === 'string' ? node.tag.match(/^H(\d)$/) : null;
     const extra: string[] = [];
@@ -363,10 +379,7 @@ function hasInteractiveDescendant(node: any, includeCursor = false): boolean {
   return false;
 }
 
-export async function snapshot(
-  page: Page,
-  opts: SnapshotOptions = {}
-): Promise<string> {
+export async function snapshot(page: Page, opts: SnapshotOptions = {}): Promise<string> {
   const frames = await collectFrames(page, opts.selector);
   if (frames.length === 0) return '(no frames)';
 
@@ -414,7 +427,10 @@ export function parseRef(ref: string): { frameIdx: number; local: string } {
   return { frameIdx: 0, local: r };
 }
 
-export async function resolveRef(page: Page, ref: string): Promise<{ locator: Locator; selector: string; frameIdx: number }> {
+export async function resolveRef(
+  page: Page,
+  ref: string,
+): Promise<{ locator: Locator; selector: string; frameIdx: number }> {
   const { frameIdx, local } = parseRef(ref);
   const frames = page.frames();
   if (frameIdx < 0 || frameIdx >= frames.length) {

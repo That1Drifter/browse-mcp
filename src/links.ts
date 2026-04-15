@@ -1,11 +1,11 @@
 import type { Page, Frame } from 'playwright';
 
 export interface LinksOptions {
-  hrefPattern?: string;        // substring OR /regex/flags literal
-  textPattern?: string;        // case-insensitive substring
+  hrefPattern?: string; // substring OR /regex/flags literal
+  textPattern?: string; // case-insensitive substring
   sameOriginOnly?: boolean;
   max?: number;
-  includeUnlabeled?: boolean;  // include anchors with no discoverable label
+  includeUnlabeled?: boolean; // include anchors with no discoverable label
 }
 
 export interface LinkInfo {
@@ -117,11 +117,13 @@ export async function collectLinks(page: Page, opts: LinksOptions): Promise<Link
           const u = new URL(url);
           if (u.origin !== mainOrigin) continue;
         }
-      } catch { continue; }
+      } catch {
+        continue;
+      }
     }
     let items: LinkInfo[] = [];
     try {
-      items = await frame.evaluate(
+      items = (await frame.evaluate(
         `(${COLLECT_FN})(${JSON.stringify({
           hrefPattern: opts.hrefPattern,
           textPattern: opts.textPattern,
@@ -129,8 +131,8 @@ export async function collectLinks(page: Page, opts: LinksOptions): Promise<Link
           framePrefix,
           pageOrigin: mainOrigin,
           includeUnlabeled: !!opts.includeUnlabeled,
-        })})`
-      ) as LinkInfo[];
+        })})`,
+      )) as LinkInfo[];
     } catch {
       continue;
     }

@@ -14,15 +14,36 @@ export const snapshotTools: ToolModule = {
       inputSchema: {
         type: 'object',
         properties: {
-          full: { type: 'boolean', description: 'Full structural tree (default: interactive-only)' },
-          interactive: { type: 'boolean', description: 'Deprecated — interactive is now default. Ignored when full=true.' },
-          cursor_interactive: { type: 'boolean', description: 'Also include @c refs for non-ARIA clickables (div/span with cursor:pointer). Useful for React apps that skip semantic HTML.' },
+          full: {
+            type: 'boolean',
+            description: 'Full structural tree (default: interactive-only)',
+          },
+          interactive: {
+            type: 'boolean',
+            description: 'Deprecated — interactive is now default. Ignored when full=true.',
+          },
+          cursor_interactive: {
+            type: 'boolean',
+            description:
+              'Also include @c refs for non-ARIA clickables (div/span with cursor:pointer). Useful for React apps that skip semantic HTML.',
+          },
           max_depth: { type: 'number', description: 'Max tree depth' },
-          selector: { type: 'string', description: 'CSS selector to scope the tree to the subtree rooted at the first match' },
+          selector: {
+            type: 'string',
+            description: 'CSS selector to scope the tree to the subtree rooted at the first match',
+          },
           max_lines: { type: 'number', description: 'Truncate output at N lines (default 500)' },
           diff: { type: 'boolean', description: 'Return diff vs previous snapshot' },
-          clean: { type: 'boolean', description: 'Run cleanup (all categories: ads, cookie banners, sticky bars, social popups) before snapshotting' },
-          no_collapse: { type: 'boolean', description: 'Emit the literal tree without collapsing single-child [generic] wrapper chains (default: collapse enabled)' },
+          clean: {
+            type: 'boolean',
+            description:
+              'Run cleanup (all categories: ads, cookie banners, sticky bars, social popups) before snapshotting',
+          },
+          no_collapse: {
+            type: 'boolean',
+            description:
+              'Emit the literal tree without collapsing single-child [generic] wrapper chains (default: collapse enabled)',
+          },
         },
       },
     },
@@ -53,7 +74,7 @@ export const snapshotTools: ToolModule = {
   handlers: {
     async browser_snapshot(a) {
       const page = await browser.getPage();
-      const interactiveOnly = a.full ? false : (a.interactive !== false);
+      const interactiveOnly = a.full ? false : a.interactive !== false;
       const maxLines = typeof a.max_lines === 'number' ? a.max_lines : 500;
       if (a.clean) {
         await cleanup(page, { all: true });
@@ -69,7 +90,9 @@ export const snapshotTools: ToolModule = {
       if (lines.length > maxLines) {
         const kept = lines.slice(0, maxLines);
         const dropped = lines.length - maxLines;
-        tree = kept.join('\n') + `\n\n[... truncated ${dropped} more lines. Re-call with selector="<css>" to scope, or max_lines=<N> to expand.]`;
+        tree =
+          kept.join('\n') +
+          `\n\n[... truncated ${dropped} more lines. Re-call with selector="<css>" to scope, or max_lines=<N> to expand.]`;
       }
       if (a.diff) {
         const prev = browser.lastSnapshot;
@@ -103,9 +126,9 @@ export const snapshotTools: ToolModule = {
     async browser_responsive() {
       const page = await browser.getPage();
       const viewports = [
-        { label: 'mobile',  w: 375,  h: 812  },
-        { label: 'tablet',  w: 768,  h: 1024 },
-        { label: 'desktop', w: 1280, h: 720  },
+        { label: 'mobile', w: 375, h: 812 },
+        { label: 'tablet', w: 768, h: 1024 },
+        { label: 'desktop', w: 1280, h: 720 },
       ];
       const images: Array<{ label: string; buf: Buffer }> = [];
       const original = page.viewportSize();
