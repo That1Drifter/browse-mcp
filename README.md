@@ -55,6 +55,48 @@ Or, for a local checkout:
 claude mcp add browse -- node /absolute/path/to/browse-mcp/dist/index.js
 ```
 
+## Register with Claude Desktop
+
+Edit the config file (create it if it doesn't exist):
+
+| OS | Path |
+|---|---|
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Linux | `~/.config/Claude/claude_desktop_config.json` |
+
+Add:
+
+```json
+{
+  "mcpServers": {
+    "browse": {
+      "command": "npx",
+      "args": ["-y", "browse-mcp"]
+    }
+  }
+}
+```
+
+If an `"mcpServers"` block already exists, add the `"browse"` entry inside it. Then **fully quit and relaunch Claude Desktop** (tray icon → Quit, or Cmd+Q — closing the window is not enough). The `browser_*` tools will appear under the chat input's tool menu on next launch.
+
+**Windows PATH gotcha:** Claude Desktop on Windows doesn't inherit your shell's PATH, so `npx` may not resolve. Use an absolute path:
+
+```json
+{
+  "mcpServers": {
+    "browse": {
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
+      "args": ["-y", "browse-mcp"]
+    }
+  }
+}
+```
+
+(Note the `.cmd` suffix and escaped backslashes.)
+
+First launch downloads Playwright's bundled Chromium (~150 MB). To avoid a startup delay on first use, pre-cache it once: run `npx browse-mcp` from a terminal and Ctrl+C once Chromium finishes downloading.
+
 ## Schema budget
 
 All 37 tools exposed at once is roughly **4.9K tokens / 19.5 KB** of schema — about 5% of a 100K context window, before any actual work.
