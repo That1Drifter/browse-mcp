@@ -49,7 +49,7 @@ export async function downloadUrl(
 
   // goto() will throw "Download is starting" for attachments — catch it
   let navErr: Error | null = null;
-  const navResult = await page.goto(url).catch((e) => {
+  const navResult = await page.goto(url).catch((e: Error) => {
     if (/download is starting/i.test(e.message)) return 'download-triggered';
     navErr = e;
     return null;
@@ -60,7 +60,7 @@ export async function downloadUrl(
     if (forceFetch) {
       return await fetchFallback(url, dir);
     }
-    const reason = navErr ? navErr.message : `nav: ${navResult}`;
+    const reason = navErr ? (navErr as Error).message : `nav: ${navResult}`;
     throw new Error(`URL did not trigger a download: ${url} (${reason})`);
   }
 
