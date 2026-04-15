@@ -26,6 +26,7 @@ import {
 } from './search.js';
 import { readArticle, formatArticle } from './read.js';
 import { collectLinks } from './links.js';
+import { research } from './research.js';
 
 const server = new Server(
   { name: 'browse-mcp', version: '0.1.0' },
@@ -270,12 +271,16 @@ const tools = [
   {
     name: 'browser_download',
     description:
-      'Download a URL that triggers a file download (PDF with attachment disposition, binary file, etc.). Returns the saved file path and size. Use when browser_navigate fails with "Download is starting".',
+      'Download a URL that triggers a file download (PDF with attachment disposition, binary file, etc.). Returns the saved file path and size. Use when browser_navigate fails with "Download is starting". Pass force_fetch=true to fall back to a raw fetch() when the URL does not trigger a browser download event (useful for plain SVG/HTML/JSON URLs).',
     inputSchema: {
       type: 'object',
       properties: {
         url: { type: 'string', description: 'URL to download' },
         save_dir: { type: 'string', description: 'Optional directory (default: ~/.browse-mcp/downloads)' },
+        force_fetch: {
+          type: 'boolean',
+          description: 'If the page does not trigger a download within ~3s, fall back to a raw fetch() of the URL (default false).',
+        },
       },
       required: ['url'],
     },
@@ -475,6 +480,25 @@ const tools = [
         index: { type: 'number', description: 'Tab index from browser_tabs' },
       },
       required: ['index'],
+    },
+  },
+  {
+    name: 'browser_research',
+    description:
+      'High-level research macro: searches DuckDuckGo for the query, navigates to the top N results in turn, runs Readability on each, and returns one concatenated Markdown document with per-source headers. Failed reads are listed in a "Skipped" section at the bottom rather than aborting the whole call. Per-source body is capped at ~6KB. Reuses the existing browser page — prior page state may influence navigation.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Research query' },
+        max_results: { type: 'number', description: 'Number of top search results to read (default 5)' },
+        region: { type: 'string', description: 'DDG region code, e.g. "us-en"' },
+        format: {
+          type: 'string',
+          enum: ['markdown', 'text', 'json'],
+          description: 'Output format (default: markdown)',
+        },
+      },
+      required: ['query'],
     },
   },
 ];
@@ -684,7 +708,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
       case 'browser_download': {
         const page = await browser.getPage();
-        const result = await downloadUrl(page, a.url, a.save_dir);
+        const result = await downloadUrl(page, a.url, { saveDir: a.save_dir, forceFetch: !!a.force_fetch });
         return text(
           `Downloaded ${result.filename}\n  path: ${result.path}\n  size: ${result.sizeBytes} bytes\n  from: ${result.url}`
         );
@@ -901,6 +925,18 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         browser.setActivePage(target);
         await target.bringToFront().catch(() => {});
         return text(`Switched to tab ${idx}: ${target.url()}`);
+      }
+
+      case 'browser_research': {
+        const page = await browser.getPage();
+        const format = (a.format as 'markdown' | 'text' | 'json') || 'markdown';
+        const { output } = await research(page, {
+          query: a.query,
+          maxResults: typeof a.max_results === 'number' ? a.max_results : 5,
+          region: a.region,
+          format,
+        });
+        return text(output);
       }
 
       default:
