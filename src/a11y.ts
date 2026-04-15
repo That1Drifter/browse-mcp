@@ -36,7 +36,9 @@ export interface A11yResult {
 export async function runAxeAudit(page: Page): Promise<A11yResult> {
   const source = getAxeSource();
   await page.evaluate(source);
-  const result = await page.evaluate(`(async () => {
+  // Pass a real function (not a stringified template) so TS type syntax can't leak into the browser parser
+  const result = await page.evaluate(async () => {
+    // @ts-ignore - axe is injected into window by the prior evaluate
     const r = await window.axe.run();
     return {
       violations: r.violations,
@@ -45,8 +47,8 @@ export async function runAxeAudit(page: Page): Promise<A11yResult> {
       timestamp: r.timestamp,
       url: r.url,
     };
-  })()`) as A11yResult;
-  return result;
+  });
+  return result as A11yResult;
 }
 
 export function formatA11yResult(r: A11yResult): string {
