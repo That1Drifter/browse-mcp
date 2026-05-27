@@ -13,10 +13,10 @@ A headless-browser MCP server for Claude (or any MCP client). Playwright-based, 
 - API surface (tool names, arguments, output shapes) may change between minor versions until 1.0.
 - Breaking changes are possible on any 0.x bump; pin a version in production use.
 - No community validation yet — you may be the first user to hit a given edge case.
-- Search endpoints scrape DuckDuckGo/Bing HTML and can break without notice (see issue #3).
-- The persistent Chromium profile stores cookies/sessions on disk — review issue #8 before trusting it with sensitive accounts.
+- The unofficial DDG/Bing scrape rungs in `browser_search` are increasingly blocked by Cloudflare and TLS-JA3 fingerprinting. As of 0.4.0 the tool falls back through several rungs (rendered Playwright, optional Brave / Tavily API keys) and logs each miss, but a free API key is strongly recommended for reliable search — see the [Search & research](#search--research) section.
+- The persistent Chromium profile stores cookies/sessions on disk — review [SECURITY.md](./SECURITY.md) before trusting it with sensitive accounts.
 
-Feedback, bug reports, and PRs are welcome via the [issue tracker](https://github.com/That1Drifter/browse-mcp/issues). Near-term priorities live in [ROADMAP.md](./ROADMAP.md).
+Feedback, bug reports, and PRs are welcome via the [issue tracker](https://github.com/That1Drifter/browse-mcp/issues). Near-term priorities live in [ROADMAP.md](./ROADMAP.md); release history in [CHANGELOG.md](./CHANGELOG.md).
 
 ## Why another browser MCP?
 
@@ -26,7 +26,7 @@ The differentiators:
 
 - **`browser_research`** — single call: search → visit top N results → run Readability on each → return concatenated Markdown. Replaces a 10-roundtrip workflow.
 - **`browser_read`** — Readability extraction for clean article text (no scripts, nav, ads, chrome).
-- **`browser_search` / `_news` / `_images`** — DuckDuckGo + Bing fallback, no API key, no browser launch per query.
+- **`browser_search` / `_news` / `_images`** — layered provider chain (optional Brave / Tavily keys -> fetch DDG -> fetch Bing -> Playwright-rendered fallback), with structured telemetry on every fallback miss.
 - **Accessibility-tree snapshots with `@eN` refs** — interactive-only by default, collapses single-child wrappers, pierces shadow DOM and iframes. Far more compact than a full DOM dump.
 - **Self-improvement loop** — every tool error auto-logs to `~/.browse-mcp/issues.jsonl`. `browser_report_difficulty` lets the agent flag subtler friction. `browser_review_issues` surfaces known rough edges at session start.
 - **Persistent profile** — OAuth/MFA/CAPTCHA solves survive across sessions.

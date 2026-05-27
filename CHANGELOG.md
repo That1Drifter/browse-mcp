@@ -8,6 +8,20 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-27
+
+### Added
+- `BROWSE_MCP_TAVILY_API_KEY` opt-in [Tavily Search](https://app.tavily.com/) provider (1000 req/mo free, AI-curated). Tried after Brave in the search provider chain (#27).
+- Playwright-rendered DDG/Bing fallback for `browser_search`. When the fetch-based scrape returns 0 (anti-bot interstitial or layout drift), the search reruns inside the real browser context and parses the live DOM. Layered chain: Brave (key) -> Tavily (key) -> fetch DDG -> fetch Bing -> rendered DDG -> rendered Bing (#24).
+- Structured `difficulty` log entries with 600-char `htmlExcerpt`, page title, and URL when rendered DDG/Bing fallbacks return 0 results. Visible via `browser_review_issues` for drift debugging without a live repro (#26).
+
+### Fixed
+- `browser_extract_listings({ href_pattern: "/inventory/used" })` no longer throws `Invalid flags supplied to RegExp constructor 'used'`. `href_pattern` is now treated as a substring by default; the value is only parsed as a regex when wrapped in `/.../flags` AND flags validate against `/^[gimsuy]*$/`. Applied symmetrically to `browser_links` (#22).
+- `browser_read` no longer fails with `Refused to execute inline script` on github.com, Cloudflare-challenged pages, and any site with strict `script-src` CSP. Readability source now runs through `page.evaluate(<string>)` (CDP `Runtime.evaluate`, which bypasses CSP) instead of `page.addScriptTag` which injects a real `<script>` element (#23).
+
+### Changed
+- `FRAGILITY NOTICE` in `src/search.ts` and the README search section now lead with the API-key recommendation. The scrape rungs are documented as a best-effort backstop; the new fallback chain and telemetry are documented as the response to Cloudflare/TLS-JA3 fingerprinting that increasingly blocks Playwright clients.
+
 ## [0.3.0] - 2026-04-15
 
 ### Added
@@ -43,7 +57,8 @@ as described in [VERSIONING.md](./VERSIONING.md).
 - First public release — initial set of browser tools, accessibility-tree
   refs, Readability extraction, search, annotated screenshots.
 
-[Unreleased]: https://github.com/That1Drifter/browse-mcp/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/That1Drifter/browse-mcp/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/That1Drifter/browse-mcp/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/That1Drifter/browse-mcp/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/That1Drifter/browse-mcp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/That1Drifter/browse-mcp/releases/tag/v0.2.0
