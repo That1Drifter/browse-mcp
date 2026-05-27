@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import { duckDuckGoSearch, type SearchResult } from './search.js';
+import { searchWithBrowserFallback, type SearchResult } from './search.js';
 import { readArticle, formatArticle } from './read.js';
 
 export interface ResearchOptions {
@@ -27,7 +27,12 @@ export async function research(
 ): Promise<{ output: string; sources: ResearchSource[] }> {
   const format = opts.format || 'markdown';
   const maxResults = opts.maxResults ?? 5;
-  const results: SearchResult[] = await duckDuckGoSearch(opts.query, maxResults, opts.region);
+  const results: SearchResult[] = await searchWithBrowserFallback(
+    page,
+    opts.query,
+    maxResults,
+    opts.region,
+  );
 
   const sources: ResearchSource[] = [];
   for (const r of results) {

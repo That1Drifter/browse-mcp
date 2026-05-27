@@ -1,6 +1,6 @@
 import { browser } from '../browser.js';
 import {
-  duckDuckGoSearch,
+  searchWithBrowserFallback,
   duckDuckGoNewsSearch,
   duckDuckGoImageSearch,
   formatResults,
@@ -91,7 +91,8 @@ export const search: ToolModule = {
   handlers: {
     async browser_search(a) {
       const max = typeof a.max_results === 'number' ? a.max_results : 10;
-      const results = await duckDuckGoSearch(a.query, max, a.region);
+      const page = await browser.getPage();
+      const results = await searchWithBrowserFallback(page, a.query, max, a.region);
       return text(a.json ? JSON.stringify(results, null, 2) : formatResults(results));
     },
 
