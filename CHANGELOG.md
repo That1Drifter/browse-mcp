@@ -8,6 +8,8 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-05-27
+
 ### Fixed
 - `postinstall` script now runs `playwright install chromium` so the Chromium binary is fetched at install time instead of erroring on first browser call with `Executable doesn't exist at .../chrome-headless-shell.exe`. Removes the manual `npx playwright install chromium` step from the source-install path (#29).
 
