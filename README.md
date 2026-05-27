@@ -154,12 +154,19 @@ Bundles: `core` (nav/snapshot/click/type/eval/wait/close, 8 tools), `search` (4)
 ### Search & research
 | Tool | What it does |
 |---|---|
-| `browser_search` | Web search via DuckDuckGo HTML endpoint. No API key, no browser. Falls back to Bing if DDG returns nothing. Optional Brave Search API via `BROWSE_MCP_BRAVE_API_KEY` |
+| `browser_search` | Web search. Tries configured API providers first (Brave, Tavily), then scrapes DuckDuckGo, then Bing, then a Playwright-rendered fallback. Works with zero config, but a free API key is recommended (see below). |
 | `browser_search_news` | News search with timestamps and source |
 | `browser_search_images` | Image search — title/image/thumbnail/dimensions/source |
 | `browser_research` | **Macro:** search → read top N → concatenated Markdown. One call. |
 
-> **Heads up — search endpoints are unofficial.** `browser_search` / `_news` / `_images` scrape `html.duckduckgo.com`, `duckduckgo.com/i.js`, `duckduckgo.com/news.js`, and Bing's `b_algo` HTML. None of these are documented APIs, so a provider layout change can break parsing. When a parser returns zero results, browse-mcp logs a structured event to `~/.browse-mcp/issues.jsonl` (visible via `browser_review_issues`) and surfaces an explanatory error. For a supported API-based fallback, set `BROWSE_MCP_BRAVE_API_KEY` to a [Brave Search API](https://api.search.brave.com/) key — Brave is then tried first for `browser_search`, with DDG/Bing as the backup path.
+> **Recommended: set one search API key for reliable results.** The scrape rungs (DDG/Bing) regularly get hit by Cloudflare/TLS-JA3 challenges that return the "418 teapot" / 403 interstitial to Playwright. browse-mcp falls back across rungs and logs each failure, but the most reliable path is an API key. Both options below have generous free tiers and require nothing more than an email signup:
+>
+> | Provider | Free tier | Env var |
+> |---|---|---|
+> | [Brave Search API](https://api.search.brave.com/app/keys) | ~1k req/mo on the free credit | `BROWSE_MCP_BRAVE_API_KEY` |
+> | [Tavily Search](https://app.tavily.com/) | 1000 req/mo, AI-curated results | `BROWSE_MCP_TAVILY_API_KEY` |
+>
+> Providers are tried in the order listed; on miss or failure we fall through to the next, then to the scrape rungs. With no keys set the tool still works (scrape only); silent fallback failures are logged to `~/.browse-mcp/issues.jsonl` and surfaced via `browser_review_issues`.
 
 ### Screenshots & visual
 | Tool | What it does |
