@@ -3,9 +3,12 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 // Readability source bundled via the @mozilla/readability npm dep. We load the
-// plain browser-compatible Readability.js from the installed package and
-// inject it into the page via addScriptTag (same pattern as before, but no
-// runtime network fetch).
+// plain browser-compatible Readability.js from the installed package and run
+// it inside the page via page.evaluate, NOT via addScriptTag. addScriptTag
+// adds a real <script> element and gets blocked by strict `script-src` CSP
+// (github.com, Cloudflare-challenged sites — issue #20). page.evaluate ships
+// the source through CDP Runtime.evaluate, which bypasses CSP because no
+// script element is loaded into the document.
 const require_ = createRequire(import.meta.url);
 let readabilitySrc: string | null = null;
 
@@ -40,13 +43,20 @@ export async function readArticle(
     await page.goto(opts.url, { waitUntil: 'domcontentloaded' });
   }
   const src = loadReadability();
-  await page.addScriptTag({ content: src });
-  const result = await page.evaluate(() => {
-    // @ts-ignore — Readability injected via addScriptTag
-    const R = (window as any).Readability;
-    if (!R) return null;
-    const clone = document.cloneNode(true) as Document;
+  // Inline Readability source + extractor into a single expression and
+  // evaluate it. page.evaluate(<string>) runs through CDP and is not subject
+  // to the document's `script-src` CSP (issue #20). Wrapped in an IIFE so the
+  // Readability UMD wrapper attaches to `window.Readability` as usual.
+  const expr = `(() => {
     try {
+      ${src}
+    } catch (_e) {
+      return { __readError: 'inject failed: ' + (_e && _e.message ? _e.message : String(_e)) };
+    }
+    const R = (window && window.Readability) || (typeof Readability !== 'undefined' ? Readability : null);
+    if (!R) return null;
+    try {
+      const clone = document.cloneNode(true);
       const parsed = new R(clone).parse();
       if (!parsed) return null;
       return {
@@ -59,10 +69,14 @@ export async function readArticle(
         length: parsed.length || 0,
         excerpt: parsed.excerpt || null,
       };
-    } catch {
+    } catch (_e) {
       return null;
     }
-  });
+  })()`;
+  const result = (await page.evaluate(expr)) as
+    | (ReadabilityArticle & { __readError?: string })
+    | null;
+  if (result && (result as any).__readError) return null;
   return result as ReadabilityArticle | null;
 }
 
