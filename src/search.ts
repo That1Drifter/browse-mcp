@@ -381,6 +381,7 @@ export async function browserDuckDuckGoSearch(
     waitUntil: 'domcontentloaded',
     timeout: 20_000,
   });
+  let waitTimedOut = false;
   await page
     .waitForFunction(
       () =>
@@ -390,7 +391,9 @@ export async function browserDuckDuckGoSearch(
       null,
       { timeout: 10_000 },
     )
-    .catch(() => {});
+    .catch(() => {
+      waitTimedOut = true;
+    });
 
   const out = (await page.evaluate((max) => {
     const seen = new Set<string>();
@@ -433,6 +436,26 @@ export async function browserDuckDuckGoSearch(
     }
     return results;
   }, maxResults)) as SearchResult[];
+  if (out.length === 0) {
+    // Silent breakage was the original sin (issue #25). Surface enough state
+    // for `browser_review_issues` to detect future selector / interstitial
+    // drift on the rendered DDG fallback rung.
+    const diag = await page
+      .evaluate(() => ({
+        title: document.title,
+        url: location.href,
+        htmlExcerpt: document.documentElement.outerHTML.slice(0, 600),
+      }))
+      .catch(() => ({ title: '', url: '', htmlExcerpt: '' }));
+    await logIssue({
+      kind: 'difficulty',
+      tool: 'browser_search',
+      note: `Rendered DDG fallback returned 0 results${
+        waitTimedOut ? ' (selector wait timed out — likely SPA anti-bot interstitial)' : ''
+      }`,
+      context: { query, ...diag },
+    });
+  }
   return out;
 }
 
@@ -445,13 +468,16 @@ export async function browserBingSearch(
     waitUntil: 'domcontentloaded',
     timeout: 20_000,
   });
+  let waitTimedOut = false;
   await page
     .waitForFunction(
       () => !!document.querySelector('li.b_algo') || !!document.querySelector('#b_results'),
       null,
       { timeout: 10_000 },
     )
-    .catch(() => {});
+    .catch(() => {
+      waitTimedOut = true;
+    });
 
   const out = (await page.evaluate((max) => {
     const seen = new Set<string>();
@@ -492,6 +518,23 @@ export async function browserBingSearch(
     }
     return results;
   }, maxResults)) as SearchResult[];
+  if (out.length === 0) {
+    const diag = await page
+      .evaluate(() => ({
+        title: document.title,
+        url: location.href,
+        htmlExcerpt: document.documentElement.outerHTML.slice(0, 600),
+      }))
+      .catch(() => ({ title: '', url: '', htmlExcerpt: '' }));
+    await logIssue({
+      kind: 'difficulty',
+      tool: 'browser_search',
+      note: `Rendered Bing fallback returned 0 results${
+        waitTimedOut ? ' (b_algo wait timed out — likely interstitial or layout drift)' : ''
+      }`,
+      context: { query, ...diag },
+    });
+  }
   return out;
 }
 
