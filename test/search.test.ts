@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   parseResults,
   parseBingResults,
+  parseBraveResults,
+  parseTavilyResults,
   unwrapDdgRedirect,
   unwrapBingRedirect,
   decodeEntities,
@@ -133,6 +135,83 @@ describe('parseBingResults', () => {
 
   it('returns empty for no algo blocks', () => {
     expect(parseBingResults('<div>nothing here</div>', 10)).toEqual([]);
+  });
+});
+
+describe('parseBraveResults', () => {
+  it('maps Brave web.results items to SearchResult', () => {
+    const items = [
+      { title: 'First', url: 'https://a.example', description: 'desc <b>one</b>' },
+      { title: 'Second', url: 'https://b.example', description: 'desc two' },
+    ];
+    const r = parseBraveResults(items, 10);
+    expect(r).toHaveLength(2);
+    expect(r[0]).toMatchObject({
+      title: 'First',
+      url: 'https://a.example',
+      snippet: 'desc one',
+      engine: 'brave',
+    });
+  });
+
+  it('drops items missing title or url', () => {
+    const items = [
+      { title: '', url: 'https://x', description: 'd' },
+      { title: 'OK', url: '', description: 'd' },
+      { title: 'Good', url: 'https://g', description: 'd' },
+    ];
+    expect(parseBraveResults(items, 10)).toHaveLength(1);
+  });
+
+  it('respects maxResults cap', () => {
+    const items = Array.from({ length: 5 }, (_, i) => ({
+      title: `T${i}`,
+      url: `https://e/${i}`,
+      description: 'd',
+    }));
+    expect(parseBraveResults(items, 2)).toHaveLength(2);
+  });
+});
+
+describe('parseTavilyResults', () => {
+  it('maps Tavily results items to SearchResult', () => {
+    const items = [
+      { title: 'Doc', url: 'https://x.example', content: 'snippet body' },
+      { title: 'Page', url: 'https://y.example', content: 'second body' },
+    ];
+    const r = parseTavilyResults(items, 10);
+    expect(r).toHaveLength(2);
+    expect(r[0]).toMatchObject({
+      title: 'Doc',
+      url: 'https://x.example',
+      snippet: 'snippet body',
+      engine: 'tavily',
+    });
+  });
+
+  it('drops items missing title or url', () => {
+    const items = [
+      { title: '', url: 'https://x', content: 'c' },
+      { title: 'OK', url: '', content: 'c' },
+      { title: 'Good', url: 'https://g', content: 'c' },
+    ];
+    expect(parseTavilyResults(items, 10)).toHaveLength(1);
+  });
+
+  it('strips HTML tags from title and snippet', () => {
+    const items = [{ title: 'Hello <b>world</b>', url: 'https://h', content: '<i>tag</i> body' }];
+    const r = parseTavilyResults(items, 10);
+    expect(r[0].title).toBe('Hello world');
+    expect(r[0].snippet).toBe('tag body');
+  });
+
+  it('respects maxResults cap', () => {
+    const items = Array.from({ length: 5 }, (_, i) => ({
+      title: `T${i}`,
+      url: `https://e/${i}`,
+      content: 'c',
+    }));
+    expect(parseTavilyResults(items, 2)).toHaveLength(2);
   });
 });
 

@@ -1,27 +1,30 @@
-// DuckDuckGo HTML-endpoint search. No JS, no API key, no browser launch.
-// Endpoint returns server-rendered HTML we can regex-parse for top results.
+// Web search with provider menu + scrape fallback.
 //
 // FRAGILITY NOTICE
 // ----------------
-// None of the endpoints used here are official / documented APIs:
+// The scrape-based rungs hit unofficial endpoints that anti-bot systems
+// actively challenge:
 //   - https://html.duckduckgo.com/html/        (DDG HTML SERP)
 //   - https://duckduckgo.com/i.js              (DDG images JSON, needs vqd token)
 //   - https://duckduckgo.com/news.js           (DDG news JSON, needs vqd token)
 //   - https://www.bing.com/search              (Bing b_algo HTML SERP fallback)
 //
-// The selectors / JSON shapes below are "last verified" as of 2026-04-15.
-// When a provider changes layout, the parsers will quietly return zero
-// results. We mitigate that by:
-//   (1) logging a structured "parse returned 0" telemetry event to
-//       ~/.browse-mcp/issues.jsonl (via logIssue) so CI / the agent can
-//       notice silent breakage on `browser_review_issues`.
-//   (2) falling back DDG -> Bing on empty / failure.
-//   (3) offering an opt-in Brave Search API path via the
-//       BROWSE_MCP_BRAVE_API_KEY env var. When set, Brave is tried first
-//       for browser_search and used as a last-resort fallback for
-//       browser_search_news. No key == current behavior.
-//   (4) raising informative errors that mention the likely cause
-//       (provider layout change) rather than a bare "no results".
+// Cloudflare / TLS-JA3 fingerprinting frequently returns the "418 teapot" /
+// 403 interstitial to Node+Playwright clients regardless of UA spoofing
+// (see issue #19 / #25). For reliable search, set an API key via one of:
+//   - BROWSE_MCP_BRAVE_API_KEY  — Brave Search, ~1k req/mo free
+//   - BROWSE_MCP_TAVILY_API_KEY — Tavily Search, 1k req/mo free, AI-curated
+// Keys are tried in order; on miss/failure we fall through to the next.
+// With no keys set we still try the scrape path as a best-effort backstop.
+//
+// Resilience layers:
+//   (1) provider menu (Brave, Tavily) tried before scrape — opt-in via env.
+//   (2) scrape order: fetch DDG -> fetch Bing on empty/error.
+//   (3) Playwright-rendered fallback (browserDuckDuckGoSearch /
+//       browserBingSearch) when fetch returns 0.
+//   (4) structured "difficulty"/"error" entries logged to
+//       ~/.browse-mcp/issues.jsonl so `browser_review_issues` notices
+//       silent breakage of any rung.
 
 import type { Page } from 'playwright';
 import { logIssue } from './issues.js';
@@ -30,7 +33,7 @@ export interface SearchResult {
   title: string;
   url: string;
   snippet: string;
-  engine?: 'ddg' | 'bing' | 'brave';
+  engine?: 'ddg' | 'bing' | 'brave' | 'tavily';
 }
 
 export interface NewsResult {
@@ -68,23 +71,46 @@ function braveKey(): string | undefined {
   return k && k.trim() ? k.trim() : undefined;
 }
 
+function tavilyKey(): string | undefined {
+  const k = process.env.BROWSE_MCP_TAVILY_API_KEY;
+  return k && k.trim() ? k.trim() : undefined;
+}
+
 export async function duckDuckGoSearch(
   query: string,
   maxResults = 10,
   region?: string,
 ): Promise<SearchResult[]> {
-  // Opt-in: Brave Search API first when a key is configured. Falls through
-  // to DDG/Bing scrape on any Brave failure.
-  const key = braveKey();
-  if (key) {
+  // Opt-in API providers (Brave, Tavily) tried in turn. Each is configured
+  // via its own env var; absent keys are skipped silently. On any failure
+  // (HTTP error or 0 results) we fall through to the next provider, and
+  // finally to the DDG/Bing scrape path. This matches how published MCP
+  // tools (LangChain, llama-index, etc.) handle provider menus — no key
+  // required to use the tool, but at least one key is recommended for
+  // production-grade reliability since the scrape rungs are anti-bot bait.
+  const bKey = braveKey();
+  if (bKey) {
     try {
-      const r = await braveSearch(query, maxResults, key);
+      const r = await braveSearch(query, maxResults, bKey);
       if (r.length > 0) return r;
     } catch (err) {
       await logIssue({
         kind: 'error',
         tool: 'browser_search',
-        error: `Brave API failed, falling back to DDG: ${(err as Error).message}`,
+        error: `Brave API failed, falling back: ${(err as Error).message}`,
+      });
+    }
+  }
+  const tKey = tavilyKey();
+  if (tKey) {
+    try {
+      const r = await tavilySearch(query, maxResults, tKey);
+      if (r.length > 0) return r;
+    } catch (err) {
+      await logIssue({
+        kind: 'error',
+        tool: 'browser_search',
+        error: `Tavily API failed, falling back: ${(err as Error).message}`,
       });
     }
   }
@@ -299,6 +325,10 @@ async function braveSearch(
   if (!res.ok) throw new Error(`Brave API HTTP ${res.status}`);
   const data: any = await res.json();
   const items: any[] = data?.web?.results || [];
+  return parseBraveResults(items, maxResults);
+}
+
+export function parseBraveResults(items: any[], maxResults: number): SearchResult[] {
   const out: SearchResult[] = [];
   for (const r of items) {
     if (out.length >= maxResults) break;
@@ -310,6 +340,57 @@ async function braveSearch(
       url,
       snippet: stripTags(String(r.description || '')).trim(),
       engine: 'brave',
+    });
+  }
+  return out;
+}
+
+// --- Tavily Search API (opt-in) ---------------------------------------------
+// Free tier: 1000 req/month, no card required. Docs: https://docs.tavily.com
+// AI-curated results — title/url/content per item, plus optional `answer`
+// summary which we ignore here (we want raw results to match other providers).
+// Triggered only when BROWSE_MCP_TAVILY_API_KEY is set.
+
+async function tavilySearch(
+  query: string,
+  maxResults: number,
+  key: string,
+): Promise<SearchResult[]> {
+  const res = await fetch('https://api.tavily.com/search', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      api_key: key,
+      query,
+      max_results: Math.min(maxResults, 20),
+      search_depth: 'basic',
+      include_answer: false,
+      include_raw_content: false,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Tavily API HTTP ${res.status}${body ? `: ${body.slice(0, 200)}` : ''}`);
+  }
+  const data: any = await res.json();
+  return parseTavilyResults(data?.results || [], maxResults);
+}
+
+export function parseTavilyResults(items: any[], maxResults: number): SearchResult[] {
+  const out: SearchResult[] = [];
+  for (const r of items) {
+    if (out.length >= maxResults) break;
+    const title = stripTags(String(r.title || '')).trim();
+    const url = String(r.url || '');
+    if (!title || !url) continue;
+    out.push({
+      title,
+      url,
+      snippet: stripTags(String(r.content || '')).trim(),
+      engine: 'tavily',
     });
   }
   return out;
