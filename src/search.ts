@@ -23,6 +23,7 @@
 //   (4) raising informative errors that mention the likely cause
 //       (provider layout change) rather than a bare "no results".
 
+import type { Page } from 'playwright';
 import { logIssue } from './issues.js';
 
 export interface SearchResult {
@@ -112,7 +113,7 @@ export async function duckDuckGoSearch(
         kind: 'difficulty',
         tool: 'browser_search',
         note: `DDG HTML parser ${DDG_HTML_PARSER_VERSION} returned 0 results — endpoint layout may have changed or bot-detection triggered`,
-        context: { htmlLen: html.length, query },
+        context: { htmlLen: html.length, htmlExcerpt: html.slice(0, 600), query },
       });
       return await bingSearch(query, maxResults);
     }
@@ -356,10 +357,185 @@ async function bingSearch(query: string, maxResults: number): Promise<SearchResu
       kind: 'difficulty',
       tool: 'browser_search',
       note: `Bing HTML parser ${BING_HTML_PARSER_VERSION} returned 0 results — b_algo selector may have changed or bot-detection triggered`,
-      context: { htmlLen: html.length, query },
+      context: { htmlLen: html.length, htmlExcerpt: html.slice(0, 600), query },
     });
   }
   return results;
+}
+
+// --- Playwright-rendered fallbacks ------------------------------------------
+// When the fetch-based DDG/Bing HTML parsers return 0 (anti-bot interstitial
+// or layout drift — see issue #19), we re-run the search inside the real
+// browser context. The stealth profile + rendered DOM evades the cases that
+// break the fetch path. Called from searchWithBrowserFallback below.
+
+export async function browserDuckDuckGoSearch(
+  page: Page,
+  query: string,
+  maxResults = 10,
+): Promise<SearchResult[]> {
+  // Use the SPA endpoint (duckduckgo.com) — html.duckduckgo.com tends to
+  // serve the bot interstitial that broke our fetch path. kp=-2 disables
+  // safesearch nag redirects that occasionally hide results.
+  await page.goto('https://duckduckgo.com/?q=' + encodeURIComponent(query) + '&kp=-2', {
+    waitUntil: 'domcontentloaded',
+    timeout: 20_000,
+  });
+  await page
+    .waitForFunction(
+      () =>
+        !!document.querySelector('article[data-testid="result"]') ||
+        !!document.querySelector('a[data-testid="result-title-a"]') ||
+        !!document.querySelector('a.result__a'),
+      null,
+      { timeout: 10_000 },
+    )
+    .catch(() => {});
+
+  const out = (await page.evaluate((max) => {
+    const seen = new Set<string>();
+    const results: { title: string; url: string; snippet: string; engine: string }[] = [];
+    // Modern SPA layout: article[data-testid="result"].
+    const articles = Array.from(
+      document.querySelectorAll('article[data-testid="result"]'),
+    ) as HTMLElement[];
+    for (const a of articles) {
+      if (results.length >= max) break;
+      const titleA = (a.querySelector('a[data-testid="result-title-a"]') ||
+        a.querySelector('h2 a') ||
+        a.querySelector('a')) as HTMLAnchorElement | null;
+      if (!titleA) continue;
+      const href = titleA.href || '';
+      const title = (titleA.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!href || !title || seen.has(href)) continue;
+      const snipEl =
+        a.querySelector('[data-result="snippet"]') ||
+        a.querySelector('span[data-testid="result-extras-snippet"]') ||
+        a.querySelector('div[data-testid="result-snippet"]');
+      const snippet = snipEl ? (snipEl.textContent || '').replace(/\s+/g, ' ').trim() : '';
+      seen.add(href);
+      results.push({ title, url: href, snippet, engine: 'ddg' });
+    }
+    // Legacy html.duckduckgo.com layout — used if the SPA didn't render.
+    if (results.length === 0) {
+      const anchors = Array.from(document.querySelectorAll('a.result__a')) as HTMLAnchorElement[];
+      for (const titleA of anchors) {
+        if (results.length >= max) break;
+        const href = titleA.href || '';
+        const title = (titleA.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!href || !title || seen.has(href)) continue;
+        const row = titleA.closest('.result, .web-result');
+        const snipEl = row ? row.querySelector('.result__snippet') : null;
+        const snippet = snipEl ? (snipEl.textContent || '').replace(/\s+/g, ' ').trim() : '';
+        seen.add(href);
+        results.push({ title, url: href, snippet, engine: 'ddg' });
+      }
+    }
+    return results;
+  }, maxResults)) as SearchResult[];
+  return out;
+}
+
+export async function browserBingSearch(
+  page: Page,
+  query: string,
+  maxResults = 10,
+): Promise<SearchResult[]> {
+  await page.goto('https://www.bing.com/search?q=' + encodeURIComponent(query), {
+    waitUntil: 'domcontentloaded',
+    timeout: 20_000,
+  });
+  await page
+    .waitForFunction(
+      () => !!document.querySelector('li.b_algo') || !!document.querySelector('#b_results'),
+      null,
+      { timeout: 10_000 },
+    )
+    .catch(() => {});
+
+  const out = (await page.evaluate((max) => {
+    const seen = new Set<string>();
+    const results: { title: string; url: string; snippet: string; engine: string }[] = [];
+    const items = Array.from(document.querySelectorAll('li.b_algo')) as HTMLElement[];
+    for (const item of items) {
+      if (results.length >= max) break;
+      const titleA = item.querySelector('h2 a') as HTMLAnchorElement | null;
+      if (!titleA) continue;
+      let href = titleA.href || '';
+      try {
+        const u = new URL(href);
+        if (u.hostname.endsWith('bing.com') && u.pathname === '/ck/a') {
+          const uParam = u.searchParams.get('u');
+          if (uParam && uParam.startsWith('a1')) {
+            const b64 = uParam.slice(2).replace(/-/g, '+').replace(/_/g, '/');
+            const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
+            try {
+              const decoded = atob(b64 + pad);
+              if (/^https?:\/\//i.test(decoded)) href = decoded;
+            } catch {
+              /* keep wrapper */
+            }
+          }
+        }
+      } catch {
+        /* keep raw href */
+      }
+      const title = (titleA.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!href || !title || seen.has(href)) continue;
+      const cap =
+        item.querySelector('.b_caption p') ||
+        item.querySelector('p.b_lineclamp2') ||
+        item.querySelector('p');
+      const snippet = cap ? (cap.textContent || '').replace(/\s+/g, ' ').trim() : '';
+      seen.add(href);
+      results.push({ title, url: href, snippet, engine: 'bing' });
+    }
+    return results;
+  }, maxResults)) as SearchResult[];
+  return out;
+}
+
+// Layered search: fetch DDG -> fetch Bing -> rendered DDG -> rendered Bing.
+// Use this from any callsite that has access to a Page (tools/search.ts,
+// research.ts). The fetch-only path (duckDuckGoSearch) remains exported for
+// callers without a browser context.
+export async function searchWithBrowserFallback(
+  page: Page,
+  query: string,
+  maxResults = 10,
+  region?: string,
+): Promise<SearchResult[]> {
+  try {
+    const r = await duckDuckGoSearch(query, maxResults, region);
+    if (r.length > 0) return r;
+  } catch {
+    /* fall through to rendered path */
+  }
+  try {
+    const r = await browserDuckDuckGoSearch(page, query, maxResults);
+    if (r.length > 0) return r;
+  } catch (err) {
+    await logIssue({
+      kind: 'error',
+      tool: 'browser_search',
+      error: `Rendered DDG fallback failed: ${(err as Error).message}`,
+    });
+  }
+  try {
+    const r = await browserBingSearch(page, query, maxResults);
+    if (r.length > 0) return r;
+  } catch (err) {
+    await logIssue({
+      kind: 'error',
+      tool: 'browser_search',
+      error: `Rendered Bing fallback failed: ${(err as Error).message}`,
+    });
+  }
+  throw new Error(
+    'All search backends returned 0 results (DDG fetch, Bing fetch, rendered DDG, rendered Bing). ' +
+      'Provider layouts may have changed or bot detection is blocking. ' +
+      'Set BROWSE_MCP_BRAVE_API_KEY for an API-based fallback.',
+  );
 }
 
 export function parseBingResults(html: string, max: number): SearchResult[] {
