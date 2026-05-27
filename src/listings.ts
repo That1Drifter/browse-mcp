@@ -40,14 +40,28 @@ const COLLECT_FN = `(opts) => {
   const { hrefPattern, requireText, containerSelector, groupBy } = opts;
   const mode = groupBy || 'auto';
 
-  // Build href matcher (string substring OR /regex/)
+  // Build href matcher. Treat as substring by default. Switch to regex ONLY
+  // when the input is wrapped /.../flags AND flags validate against
+  // /^[gimsuy]*$/ — otherwise a value like "/inventory/used" would be parsed
+  // as pattern "inventory" with flags "used", which throws (issue #21).
   let hrefTest;
   if (hrefPattern) {
-    if (hrefPattern.length > 2 && hrefPattern.startsWith('/') && hrefPattern.lastIndexOf('/') > 0) {
+    let regex = null;
+    if (hrefPattern.length > 2 && hrefPattern.startsWith('/')) {
       const last = hrefPattern.lastIndexOf('/');
-      const body = hrefPattern.slice(1, last);
-      const flags = hrefPattern.slice(last + 1);
-      hrefTest = (h) => new RegExp(body, flags).test(h || '');
+      if (last > 0) {
+        const flags = hrefPattern.slice(last + 1);
+        if (/^[gimsuy]*$/.test(flags)) {
+          try {
+            regex = new RegExp(hrefPattern.slice(1, last), flags);
+          } catch (_e) {
+            regex = null;
+          }
+        }
+      }
+    }
+    if (regex) {
+      hrefTest = (h) => regex.test(h || '');
     } else {
       hrefTest = (h) => (h || '').includes(hrefPattern);
     }

@@ -19,18 +19,27 @@ export interface LinkInfo {
 const COLLECT_FN = `(opts) => {
   const { hrefPattern, textPattern, sameOriginOnly, framePrefix, pageOrigin, includeUnlabeled } = opts;
 
+  // Substring by default. Regex only when wrapped /.../flags AND flags match
+  // /^[gimsuy]*$/. Keeps slash-prefixed substrings like "/inventory/used"
+  // from being parsed as pattern "inventory" with flags "used" (issue #21).
   let hrefTest;
   if (hrefPattern) {
-    if (hrefPattern.length > 2 && hrefPattern.startsWith('/') && hrefPattern.lastIndexOf('/') > 0) {
+    let rx = null;
+    if (hrefPattern.length > 2 && hrefPattern.startsWith('/')) {
       const last = hrefPattern.lastIndexOf('/');
-      const body = hrefPattern.slice(1, last);
-      const flags = hrefPattern.slice(last + 1);
-      try {
-        const rx = new RegExp(body, flags);
-        hrefTest = (h) => rx.test(h || '');
-      } catch (_e) {
-        hrefTest = (h) => (h || '').includes(hrefPattern);
+      if (last > 0) {
+        const flags = hrefPattern.slice(last + 1);
+        if (/^[gimsuy]*$/.test(flags)) {
+          try {
+            rx = new RegExp(hrefPattern.slice(1, last), flags);
+          } catch (_e) {
+            rx = null;
+          }
+        }
       }
+    }
+    if (rx) {
+      hrefTest = (h) => rx.test(h || '');
     } else {
       hrefTest = (h) => (h || '').includes(hrefPattern);
     }
