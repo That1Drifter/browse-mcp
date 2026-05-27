@@ -43,7 +43,7 @@ Requires Node.js ≥ 18.
 npx browse-mcp
 ```
 
-(Playwright-bundled Chromium will download on first launch.)
+(Playwright's bundled Chromium is installed automatically via `postinstall`.)
 
 **Option B — from source:**
 
@@ -51,7 +51,6 @@ npx browse-mcp
 git clone https://github.com/That1Drifter/browse-mcp.git
 cd browse-mcp
 npm install
-npx playwright install chromium
 npm run build
 ```
 
@@ -107,7 +106,7 @@ If an `"mcpServers"` block already exists, add the `"browse"` entry inside it. T
 
 (Note the `.cmd` suffix and escaped backslashes.)
 
-First launch downloads Playwright's bundled Chromium (~150 MB). To avoid a startup delay on first use, pre-cache it once: run `npx browse-mcp` from a terminal and Ctrl+C once Chromium finishes downloading.
+Installing browse-mcp pulls in Playwright's bundled Chromium (~150 MB) via the `postinstall` script, so the first browser call is ready immediately. If the binary is somehow missing, run `npx playwright install chromium` to fetch it manually.
 
 ## Schema budget
 
