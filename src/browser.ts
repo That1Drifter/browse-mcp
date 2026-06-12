@@ -12,6 +12,7 @@ import { mkdirSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { logIssue } from './issues.js';
+import { parseProxyEnv, parseFenceEnv, checkUrlAllowed } from './fence.js';
 
 // Ephemeral mode: no on-disk profile. Uses a fresh browser (launch) + context per run
 // so cookies/localStorage/auth never persist. Opt in with BROWSE_MCP_EPHEMERAL=1.
@@ -65,6 +66,17 @@ export function resolveDialogAction(
   }
   if (dialogType === 'beforeunload') return { handledWith: 'accept', armed: false };
   return { handledWith: 'dismiss', armed: false };
+}
+
+const PROXY = parseProxyEnv();
+const FENCE = parseFenceEnv();
+const FENCE_ACTIVE = FENCE.allowed.length > 0 || FENCE.blocked.length > 0;
+
+/** Reason a top-level navigation to this URL would be blocked, or null. */
+export function navigationBlockReason(url: string): string | null {
+  if (!FENCE_ACTIVE) return null;
+  const v = checkUrlAllowed(url, FENCE);
+  return v.allowed ? null : (v.reason ?? 'blocked by origin fence');
 }
 
 export const DEFAULT_DATA_DIR = process.env.BROWSE_MCP_HOME
@@ -149,6 +161,7 @@ class BrowserManager {
           Accept:
             'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         },
+        ...(PROXY ? { proxy: PROXY } : {}),
       };
       if (this.ephemeral) {
         this.browser = await chromium.launch({ headless: this.mode === 'headless' });
@@ -164,6 +177,33 @@ class BrowserManager {
       await this.context.addInitScript(() => {
         Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
       });
+      // Origin fence backstop: abort disallowed top-level navigations that
+      // bypass browser_navigate's pre-check (redirects, JS navs, new tabs).
+      // Subresources (CDN scripts, images) are not fenced or pages would break.
+      if (FENCE_ACTIVE) {
+        await this.context.route('**/*', (route) => {
+          const req = route.request();
+          if (req.isNavigationRequest() && req.resourceType() === 'document') {
+            const v = checkUrlAllowed(req.url(), FENCE);
+            if (!v.allowed) {
+              void logIssue({
+                kind: 'difficulty',
+                tool: 'origin-fence',
+                note: `blocked navigation: ${v.reason}`,
+                url: req.url(),
+              });
+              // Fulfill with an explanation instead of aborting so the agent
+              // sees why, not an opaque chrome-error:// page.
+              return route.fulfill({
+                status: 403,
+                contentType: 'text/html',
+                body: `<html><head><title>Blocked by origin fence</title></head><body><h1>Blocked by origin fence</h1><p>${v.reason}. This browse-mcp server restricts navigation via BROWSE_MCP_ALLOWED_ORIGINS / BROWSE_MCP_BLOCKED_ORIGINS. Do not retry this URL.</p></body></html>`,
+              });
+            }
+          }
+          return route.continue();
+        });
+      }
     }
     // Reuse existing page if present, else create one
     const existing = this.context.pages();

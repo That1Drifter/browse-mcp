@@ -190,6 +190,23 @@ BROWSE_MCP_TOOLS=core,browser_research
 
 Bundles: `core` (nav/history/snapshot/click/type/select/eval/wait/close, 11 tools), `search` (4), `content` (3), `visual` (3), `debug` (6), `edit` (3), `session` (13). Omit the var to expose everything.
 
+## Configuration
+
+All configuration is via env vars on the server process:
+
+| Var | What it does |
+|---|---|
+| `BROWSE_MCP_TOOLS` | Restrict the exposed tool list (see [Schema budget](#schema-budget)) |
+| `BROWSE_MCP_HOME` | Data directory (default `~/.browse-mcp`): profile, downloads, issues log |
+| `BROWSE_MCP_EPHEMERAL` | `1`/`true`/`yes`: in-memory profile, nothing persisted |
+| `BROWSE_MCP_BRAVE_API_KEY` / `BROWSE_MCP_TAVILY_API_KEY` | Search API providers (see [Search & research](#search--research)) |
+| `BROWSE_MCP_PROXY` | Outbound proxy: `http://host:port`, `http://user:pass@host:port`, or `socks5://host:port` |
+| `BROWSE_MCP_PROXY_BYPASS` | Comma-separated hosts that skip the proxy (e.g. `localhost,*.internal`) |
+| `BROWSE_MCP_ALLOWED_ORIGINS` | Allowlist of hosts (plus subdomains) the browser may navigate to; everything else is refused |
+| `BROWSE_MCP_BLOCKED_ORIGINS` | Hosts the browser must never navigate to (wins over the allowlist) |
+
+The origin fence applies to top-level navigations only (subresources load normally), covers redirects/JS navigations/new tabs via a route backstop, and logs blocked attempts to `issues.jsonl` — see [SECURITY.md](./SECURITY.md) for the threat model.
+
 ## Tools
 
 ### Navigation & interaction

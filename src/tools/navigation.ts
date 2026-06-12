@@ -1,5 +1,5 @@
 import { existsSync } from 'fs';
-import { browser } from '../browser.js';
+import { browser, navigationBlockReason } from '../browser.js';
 import { resolveRef } from '../snapshot.js';
 import { downloadUrl } from '../download.js';
 import { findByText, waitForText } from '../finder.js';
@@ -263,8 +263,15 @@ export const navigation: ToolModule = {
   ],
   handlers: {
     async browser_navigate(a) {
-      const page = await browser.getPage();
       const url: string = a.url;
+      const blocked = typeof url === 'string' ? navigationBlockReason(url) : null;
+      if (blocked) {
+        return text(
+          `Navigation refused by this server's origin fence: ${blocked}. The operator restricts where this browser may go via BROWSE_MCP_ALLOWED_ORIGINS / BROWSE_MCP_BLOCKED_ORIGINS; do not retry this URL.`,
+          true,
+        );
+      }
+      const page = await browser.getPage();
       if (typeof url === 'string' && /\.pdf(\?.*)?$/i.test(url)) {
         const result = await downloadUrl(page, url);
         return text(
