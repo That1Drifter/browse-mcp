@@ -62,8 +62,10 @@ removed or changed in an incompatible way:
 2. Bump `version` in `package.json` per the rules above.
 3. Commit: `release: vX.Y.Z`.
 4. Tag: `git tag vX.Y.Z && git push --tags`.
-5. Publishing to npm from tags via GitHub Actions is planned (tracked
-   separately).
+5. The `publish` workflow (`.github/workflows/publish.yml`) builds, tests,
+   and publishes the tag to npm via OIDC trusted publishing — no npm token
+   is stored in the repo, in GitHub secrets, or on any machine. It can also
+   be run manually via workflow_dispatch (publishes whatever is on main).
 
 ## Deprecation Policy
 

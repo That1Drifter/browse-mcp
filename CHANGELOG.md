@@ -8,6 +8,9 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+### Added
+- `publish` GitHub Actions workflow: tag pushes (`v*`) build, test, and publish to npm via OIDC trusted publishing (no stored token). Release process in VERSIONING.md updated.
+
 ## [0.6.0] - 2026-06-12
 
 ### Added
