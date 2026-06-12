@@ -207,6 +207,7 @@ All configuration is via env vars on the server process:
 | `BROWSE_MCP_BLOCKED_ORIGINS` | Hosts the browser must never navigate to (wins over the allowlist) |
 
 | `BROWSE_MCP_CDP` | Opt-in: expose the browser's CDP endpoint on localhost (`1` = port 9223, or a port number) so the CLI can attach to the live session. **Any local process can drive the browser through this port** — see [SECURITY.md](./SECURITY.md) |
+| `BROWSE_MCP_NO_STEALTH` | `1`/`true`/`yes`: skip the `navigator.webdriver` strip, so the browser identifies as automated. For operators whose target sites' ToS expect honest automation signals |
 
 The origin fence applies to top-level navigations only (subresources load normally), covers redirects/JS navigations/new tabs via a route backstop, and logs blocked attempts to `issues.jsonl` — see [SECURITY.md](./SECURITY.md) for the threat model.
 
@@ -320,10 +321,10 @@ Override the data dir with `BROWSE_MCP_HOME`.
 ## Design notes
 
 - **Persistent profile**: `~/.browse-mcp/chromium-profile/`. OAuth, MFA, cookies, and CAPTCHA solves survive across sessions. This is convenient but has security trade-offs — see [SECURITY.md](SECURITY.md). Set `BROWSE_MCP_EPHEMERAL=1` for an in-memory-only profile, or use `browser_reset_profile` to wipe.
-- **Soft stealth**: strips the `navigator.webdriver` tell and sets a realistic UA. Does not fight serious anti-bot systems. When blocked, `browser_navigate` suggests `browser_handoff` so a human can solve the challenge.
+- **Soft stealth**: strips the `navigator.webdriver` tell and sets a realistic UA. Does not fight serious anti-bot systems. When blocked, `browser_navigate` suggests `browser_handoff` so a human can solve the challenge. Some sites' terms expect automation to identify itself; set `BROWSE_MCP_NO_STEALTH=1` to keep the `webdriver` flag intact, and respect the sites you automate either way.
 - **Refs pierce shadow DOM** and traverse iframes. Refs from iframe N look like `@fNeM`.
 - **Search via DDG HTML endpoint + Bing fallback** sidesteps the bot-detection pages the JS-rendered SERPs serve to headless browsers.
-- **Readability is fetched from unpkg at runtime** on first `browser_read` call and cached in module scope — no npm dep, no extra build step.
+- **Readability is bundled** via the `@mozilla/readability` npm dependency — loaded from the installed package on first `browser_read` call and cached in module scope. No runtime network fetch, works offline. (Versions before 0.3.0 fetched it from unpkg.)
 
 ## Versioning
 
@@ -337,6 +338,6 @@ Design is heavily inspired by [gstack](https://github.com/garrytan/gstack)'s `br
 
 Tool naming follows Microsoft's [playwright-mcp](https://github.com/microsoft/playwright-mcp) (Apache-2.0) conventions for familiarity.
 
-Readability is [@mozilla/readability](https://github.com/mozilla/readability) (Apache-2.0), fetched at runtime from unpkg rather than bundled.
+Readability is [@mozilla/readability](https://github.com/mozilla/readability) (Apache-2.0), bundled as an npm dependency.
 
 Full third-party notices: [NOTICE.md](NOTICE.md).

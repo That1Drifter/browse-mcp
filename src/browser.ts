@@ -95,6 +95,13 @@ const CDP_PORT = (() => {
 })();
 export const CDP_FILE = join(HOME_DIR, 'cdp.json');
 
+// BROWSE_MCP_NO_STEALTH: disable the navigator.webdriver strip for operators
+// who prefer the browser to identify as automated (some sites' ToS expect it).
+const NO_STEALTH = (() => {
+  const v = (process.env.BROWSE_MCP_NO_STEALTH ?? '').toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+})();
+
 class BrowserManager {
   private context: BrowserContext | null = null;
   private browser: Browser | null = null;
@@ -181,9 +188,11 @@ class BrowserManager {
   // Stealth + origin fence apply to every context (default and isolated alike).
   private async applyContextPolicies(ctx: BrowserContext): Promise<void> {
     // Soft stealth: remove the `navigator.webdriver` tell that WAFs check for
-    await ctx.addInitScript(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    });
+    if (!NO_STEALTH) {
+      await ctx.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      });
+    }
     // Origin fence backstop: abort disallowed top-level navigations that
     // bypass browser_navigate's pre-check (redirects, JS navs, new tabs).
     // Subresources (CDN scripts, images) are not fenced or pages would break.
