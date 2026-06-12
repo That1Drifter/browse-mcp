@@ -1,7 +1,7 @@
 {
   "name": "browse-mcp",
   "version": "0.4.1",
-  "description": "Headless-browser MCP server for Claude — Playwright-based, with accessibility-tree refs, Readability, search, annotated screenshots, and a self-improvement feedback loop.",
+  "description": "Headless-browser MCP server for any MCP-capable agent (Claude, Codex, Gemini CLI, Cursor, ...). Playwright-based, with accessibility-tree refs, Readability, search, annotated screenshots, and a self-improvement feedback loop. Windows, Linux, and macOS.",
   "license": "MIT",
   "author": "Roger Maxwell (That1Drifter) <americanemt@gmail.com>",
   "repository": {
@@ -13,8 +13,11 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "claude",
-    "anthropic",
+    "codex",
+    "gemini-cli",
+    "cursor",
     "playwright",
     "browser",
     "headless",
