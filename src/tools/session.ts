@@ -1,7 +1,10 @@
-import { rm } from 'fs/promises';
+import { rm, mkdir, readFile, readdir, chmod } from 'fs/promises';
+import { existsSync } from 'fs';
+import { dirname } from 'path';
 import { browser, DEFAULT_DATA_DIR } from '../browser.js';
 import { snapshot } from '../snapshot.js';
 import { downloadUrl } from '../download.js';
+import { resolveStatePath, validateStorageState, summarizeState, STATE_DIR } from '../state.js';
 import { text, type ToolModule } from './types.js';
 
 export const session: ToolModule = {
@@ -60,6 +63,30 @@ export const session: ToolModule = {
           },
         },
         required: ['url'],
+      },
+    },
+    {
+      name: 'browser_save_state',
+      description:
+        'Export the session storage state (cookies + localStorage) to a JSON file so auth can be moved to another machine or restored later. WARNING: the file contains live session tokens — treat it like a password file. Default location: ~/.browse-mcp/state/<name>.json.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'State name (default "default")' },
+          path: { type: 'string', description: 'Explicit file path (overrides name)' },
+        },
+      },
+    },
+    {
+      name: 'browser_load_state',
+      description:
+        'Import a previously saved storage state JSON (cookies + localStorage) into the current browser context. Cookies apply immediately; localStorage requires briefly visiting each origin in the file. Merges into existing state.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'State name (default "default")' },
+          path: { type: 'string', description: 'Explicit file path (overrides name)' },
+        },
       },
     },
     {
@@ -138,6 +165,53 @@ export const session: ToolModule = {
       });
       return text(
         `Downloaded ${result.filename}\n  path: ${result.path}\n  size: ${result.sizeBytes} bytes\n  from: ${result.url}`,
+      );
+    },
+
+    async browser_save_state(a) {
+      const page = await browser.getPage();
+      const file = resolveStatePath({ name: a.name, path: a.path });
+      await mkdir(dirname(file), { recursive: true });
+      const state = await page.context().storageState({ path: file });
+      await chmod(file, 0o600).catch(() => {}); // best-effort on Windows
+      const summary = summarizeState(validateStorageState(state));
+      return text(
+        `Saved storage state to ${file}: ${summary}.\nWARNING: this file contains live session tokens — treat it like a password file.`,
+      );
+    },
+
+    async browser_load_state(a) {
+      const file = resolveStatePath({ name: a.name, path: a.path });
+      if (!existsSync(file)) {
+        const available = existsSync(STATE_DIR)
+          ? (await readdir(STATE_DIR)).filter((f) => f.endsWith('.json')).join(', ') || '(none)'
+          : '(none)';
+        return text(`No state file at ${file}. Saved states in ${STATE_DIR}: ${available}`, true);
+      }
+      const state = validateStorageState(JSON.parse(await readFile(file, 'utf8')));
+      const page = await browser.getPage();
+      const context = page.context();
+      if (state.cookies.length) {
+        await context.addCookies(state.cookies as unknown as Parameters<typeof context.addCookies>[0]);
+      }
+      const lines: string[] = [];
+      for (const o of state.origins) {
+        // localStorage is per-origin, so each origin needs a brief visit.
+        const tmp = await context.newPage();
+        try {
+          await tmp.goto(o.origin, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+          await tmp.evaluate((items) => {
+            for (const it of items) localStorage.setItem(it.name, it.value);
+          }, o.localStorage);
+          lines.push(`  ${o.origin}: ${o.localStorage.length} localStorage item(s) applied`);
+        } catch (e) {
+          lines.push(`  ${o.origin}: FAILED (${(e as Error).message})`);
+        } finally {
+          await tmp.close().catch(() => {});
+        }
+      }
+      return text(
+        `Loaded ${summarizeState(state)} from ${file} (merged into existing state).${lines.length ? '\n' + lines.join('\n') : ''}`,
       );
     },
 
