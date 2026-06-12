@@ -1,11 +1,12 @@
+type DiffOp = { type: ' ' | '+' | '-'; line: string; aIdx: number; bIdx: number };
+
 export function unifiedDiff(a: string, b: string, context = 3): string {
   const aLines = a.split('\n');
   const bLines = b.split('\n');
   const lcs = buildLcs(aLines, bLines);
-  const ops: Array<{ type: ' ' | '+' | '-'; line: string; aIdx: number; bIdx: number }> = [];
   let i = aLines.length,
     j = bLines.length;
-  const stack: typeof ops = [];
+  const stack: DiffOp[] = [];
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && aLines[i - 1] === bLines[j - 1]) {
       stack.push({ type: ' ', line: aLines[i - 1], aIdx: i - 1, bIdx: j - 1 });
@@ -23,8 +24,7 @@ export function unifiedDiff(a: string, b: string, context = 3): string {
 
   // Compress to hunks with context
   const out: string[] = [];
-  let hunkStart = -1;
-  let pending: typeof ops = [];
+  let pending: DiffOp[] = [];
   let lastChange = -1;
 
   const flush = () => {

@@ -39,7 +39,7 @@ export function image(buf: Buffer): ToolResult {
 
 export async function currentUrl(): Promise<string | undefined> {
   try {
-    // @ts-ignore — reach into manager without forcing a launch
+    // Reach into the manager's private page field without forcing a launch.
     const page = (browser as any).page;
     if (page && !page.isClosed()) return page.url();
   } catch {

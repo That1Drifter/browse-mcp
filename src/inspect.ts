@@ -143,16 +143,6 @@ export async function inspectElement(
   const handle = await page.locator(selector).first().elementHandle();
   if (!handle) throw new Error(`Element not found: ${selector}`);
 
-  const { object } = (await cdp
-    .send('DOM.resolveNode' as any, {
-      // @ts-ignore
-      objectId: (handle as any)._objectId,
-    })
-    .catch(async () => {
-      // Fallback: use describeNode via objectId from the handle
-      return { object: null };
-    })) as any;
-
   // Enable CSS + DOM domains (idempotent)
   await cdp.send('DOM.enable' as any, {}).catch(() => {});
   await cdp.send('CSS.enable' as any, {}).catch(() => {});
@@ -245,7 +235,6 @@ export async function inspectElement(
     /* ignore */
   }
 
-  const tagName = attributes.__tag || 'unknown';
   const tag = await page.evaluate((s) => {
     const el = document.querySelector(s);
     return el ? el.tagName : '';

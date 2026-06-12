@@ -153,6 +153,7 @@ export async function duckDuckGoSearch(
         `Both DDG and Bing returned 0 results. The scraped HTML layouts may have changed. ` +
           `Original DDG error: ${(err as Error).message}. ` +
           `Set BROWSE_MCP_BRAVE_API_KEY for a supported API-based fallback.`,
+        { cause: err },
       );
     } catch (bingErr) {
       // Re-throw a combined error so the agent sees both causes.
@@ -161,6 +162,7 @@ export async function duckDuckGoSearch(
           `Bing: ${(bingErr as Error).message}. ` +
           `These providers use unofficial HTML endpoints and may have changed layout. ` +
           `Set BROWSE_MCP_BRAVE_API_KEY for a supported API-based fallback.`,
+        { cause: bingErr },
       );
     }
   }
@@ -231,6 +233,7 @@ export async function duckDuckGoNewsSearch(
       `News search failed: ${(err as Error).message}. ` +
         `This uses an unofficial DDG JSON endpoint that can break when the site changes. ` +
         `No stable free news-API fallback is wired in; consider browser_search with the query + "news".`,
+      { cause: err },
     );
   }
 }
@@ -299,6 +302,7 @@ export async function duckDuckGoImageSearch(
     throw new Error(
       `Image search failed: ${(err as Error).message}. ` +
         `This uses an unofficial DDG JSON endpoint (needs a vqd token) that can break when the site changes.`,
+      { cause: err },
     );
   }
 }

@@ -38,7 +38,7 @@ export async function runAxeAudit(page: Page): Promise<A11yResult> {
   await page.evaluate(source);
   // Pass a real function (not a stringified template) so TS type syntax can't leak into the browser parser
   const result = await page.evaluate(async () => {
-    // @ts-ignore - axe is injected into window by the prior evaluate
+    // @ts-expect-error - axe is injected into window by the prior evaluate
     const r = await window.axe.run();
     return {
       violations: r.violations,
