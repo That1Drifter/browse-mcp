@@ -8,6 +8,8 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-06-12
+
 ### Added
 - `BROWSE_MCP_NO_STEALTH`: opt out of the `navigator.webdriver` strip for operators whose target sites' ToS expect automation to identify itself.
 
