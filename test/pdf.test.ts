@@ -26,7 +26,8 @@ describe('isPdfData', () => {
   });
 });
 
-describe('extractPdfText', () => {
+// Generous timeout: the first pdfjs-dist import can take >5s on slow CI runners.
+describe('extractPdfText', { timeout: 30_000 }, () => {
   it('extracts text with page markers', async () => {
     const r = await extractPdfText(fixture());
     expect(r.numPages).toBe(1);
