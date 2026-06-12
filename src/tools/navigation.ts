@@ -1,3 +1,4 @@
+import { existsSync } from 'fs';
 import { browser } from '../browser.js';
 import { resolveRef } from '../snapshot.js';
 import { downloadUrl } from '../download.js';
@@ -30,6 +31,16 @@ export const navigation: ToolModule = {
       },
     },
     {
+      name: 'browser_navigate_back',
+      description: 'Go back one entry in the tab history.',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'browser_navigate_forward',
+      description: 'Go forward one entry in the tab history.',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    {
       name: 'browser_click',
       description: 'Click an element by @ref (from snapshot) or CSS selector.',
       inputSchema: {
@@ -51,6 +62,77 @@ export const navigation: ToolModule = {
           press_enter: { type: 'boolean', description: 'Press Enter after filling' },
         },
         required: ['target', 'text'],
+      },
+    },
+    {
+      name: 'browser_select_option',
+      description:
+        'Select option(s) in a <select> element by value, label, or index. Returns the values actually selected.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          target: { type: 'string', description: '@eN ref or CSS selector of the <select>' },
+          values: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Option value attribute(s) to select',
+          },
+          labels: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Visible option label(s) to select (alternative to values)',
+          },
+          index: { type: 'number', description: 'Zero-based option index (alternative)' },
+        },
+        required: ['target'],
+      },
+    },
+    {
+      name: 'browser_file_upload',
+      description:
+        'Upload local file(s). Either set them directly on a file <input> (target) or click an element that opens a file chooser (click_target) and feed the chooser.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          files: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Absolute path(s) of local files to upload',
+          },
+          target: {
+            type: 'string',
+            description: '@ref or CSS selector of an <input type=file>',
+          },
+          click_target: {
+            type: 'string',
+            description:
+              '@ref or CSS selector of a button/element that opens the file chooser (use when the input is hidden)',
+          },
+        },
+        required: ['files'],
+      },
+    },
+    {
+      name: 'browser_handle_dialog',
+      description:
+        'Control JS dialogs (alert/confirm/prompt/beforeunload). With action: arm how the NEXT dialog(s) will be handled — call BEFORE the click that triggers the dialog. Without action: report recently seen dialogs and the current arm state. Unarmed dialogs are auto-dismissed (beforeunload auto-accepted) and recorded.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: ['accept', 'dismiss'],
+            description: 'How to handle the next dialog(s); omit to just report recent dialogs',
+          },
+          prompt_text: {
+            type: 'string',
+            description: 'Text to enter when accepting a prompt() dialog',
+          },
+          count: {
+            type: 'number',
+            description: 'How many upcoming dialogs the action applies to (default 1)',
+          },
+        },
       },
     },
     {
@@ -193,6 +275,92 @@ export const navigation: ToolModule = {
         msg += `\n\n${HANDOFF_HINT}`;
       }
       return text(msg);
+    },
+
+    async browser_navigate_back() {
+      const page = await browser.getPage();
+      // goBack() returns a null response for data:/about: URLs even when the
+      // navigation happened, so detect movement by URL instead.
+      const before = page.url();
+      await page.goBack();
+      if (page.url() === before) return text('(no back history)');
+      return text(`Went back to ${page.url()}`);
+    },
+
+    async browser_navigate_forward() {
+      const page = await browser.getPage();
+      const before = page.url();
+      await page.goForward();
+      if (page.url() === before) return text('(no forward history)');
+      return text(`Went forward to ${page.url()}`);
+    },
+
+    async browser_select_option(a) {
+      const page = await browser.getPage();
+      let choices: string[] | { label: string }[] | { index: number }[];
+      if (Array.isArray(a.values) && a.values.length) choices = a.values as string[];
+      else if (Array.isArray(a.labels) && a.labels.length)
+        choices = (a.labels as string[]).map((label) => ({ label }));
+      else if (typeof a.index === 'number') choices = [{ index: a.index }];
+      else return text('Provide one of: values, labels, or index', true);
+      let selected: string[];
+      if (a.target.startsWith('@')) {
+        const { locator } = await resolveRef(page, a.target);
+        selected = await locator.selectOption(choices);
+      } else {
+        selected = await page.locator(a.target).first().selectOption(choices);
+      }
+      return text(`Selected [${selected.join(', ')}] in ${a.target}`);
+    },
+
+    async browser_file_upload(a) {
+      const page = await browser.getPage();
+      const files: string[] = a.files;
+      const missing = files.filter((f) => !existsSync(f));
+      if (missing.length) return text(`File(s) not found: ${missing.join(', ')}`, true);
+      if (a.target) {
+        if (a.target.startsWith('@')) {
+          const { locator } = await resolveRef(page, a.target);
+          await locator.setInputFiles(files);
+        } else {
+          await page.locator(a.target).first().setInputFiles(files);
+        }
+        return text(`Set ${files.length} file(s) on ${a.target}`);
+      }
+      if (a.click_target) {
+        const chooserPromise = page.waitForEvent('filechooser', { timeout: 10000 });
+        if (a.click_target.startsWith('@')) {
+          const { locator } = await resolveRef(page, a.click_target);
+          await locator.click();
+        } else {
+          await page.click(a.click_target);
+        }
+        const chooser = await chooserPromise;
+        await chooser.setFiles(files);
+        return text(`Uploaded ${files.length} file(s) via chooser opened by ${a.click_target}`);
+      }
+      return text('Provide target (file input) or click_target (chooser opener)', true);
+    },
+
+    async browser_handle_dialog(a) {
+      await browser.getPage();
+      if (a.action) {
+        browser.armDialog(a.action, a.prompt_text, a.count ?? 1);
+        const n = a.count ?? 1;
+        return text(
+          `Armed: next ${n} dialog(s) will be ${a.action}ed${a.prompt_text ? ` with text ${JSON.stringify(a.prompt_text)}` : ''}. Now trigger the dialog.`,
+        );
+      }
+      const arm = browser.getDialogArm();
+      const recent = browser.dialogLog.slice(-10);
+      const lines = recent.map(
+        (d) =>
+          `[${new Date(d.ts).toISOString()}] ${d.type}: ${JSON.stringify(d.message)} -> ${d.handledWith}${d.promptText ? ` (${JSON.stringify(d.promptText)})` : ''}`,
+      );
+      const armLine = arm
+        ? `Armed: ${arm.action} for next ${arm.remaining} dialog(s).`
+        : 'Not armed (default: dismiss, beforeunload accepted).';
+      return text(`${armLine}\n${lines.length ? lines.join('\n') : '(no dialogs seen yet)'}`);
     },
 
     async browser_click(a) {

@@ -41,9 +41,12 @@ const handlers: Record<string, Handler> = Object.assign({}, ...MODULES.map((m) =
 const TOOL_BUNDLES: Record<string, string[]> = {
   core: [
     'browser_navigate',
+    'browser_navigate_back',
+    'browser_navigate_forward',
     'browser_snapshot',
     'browser_click',
     'browser_type',
+    'browser_select_option',
     'browser_press_key',
     'browser_wait_for',
     'browser_eval',
@@ -72,6 +75,8 @@ const TOOL_BUNDLES: Record<string, string[]> = {
     'browser_scroll',
     'browser_find_text',
     'browser_wait_for_text',
+    'browser_file_upload',
+    'browser_handle_dialog',
   ],
 };
 function filterTools(all: ToolDef[]): ToolDef[] {

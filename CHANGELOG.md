@@ -8,6 +8,13 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+### Added
+- `browser_handle_dialog`: arm how the next `alert`/`confirm`/`prompt`/`beforeunload` dialog(s) are handled (accept/dismiss, prompt text, count), or call without `action` to see recent dialogs and the arm state. Unarmed dialogs are auto-dismissed (`beforeunload` auto-accepted so navigation proceeds) and recorded; unrequested dialogs are logged to issues.jsonl for the feedback loop (#34).
+- `browser_select_option`: select `<select>` options by value, label, or index (#35).
+- `browser_file_upload`: set local files on a file input directly, or click a chooser-opening element and feed the file chooser (#35).
+- `browser_navigate_back` / `browser_navigate_forward`: tab history navigation (#35).
+- Bundles updated: `core` gains back/forward/select_option (11 tools), `session` gains file_upload/handle_dialog (12 tools).
+
 ## [0.5.0] - 2026-06-12
 
 ### Added

@@ -44,7 +44,7 @@ A comparison against microsoft/playwright-mcp (2026-06) surfaced baseline intera
 ### Quality & correctness
 
 - **Coverage for the rendered fallback paths**: current `browser*Search` functions are only exercised live, not in vitest. Add Playwright integration tests gated by an env flag so CI can opt in without paying browser-launch latency on every run.
-- **Schema-budget audit**: 37 tools is approaching the practical limit for non-lazy-loading MCP clients; review for tools that can be consolidated or moved behind `BROWSE_MCP_TOOLS` bundles. New interaction tools (#34/#35/#40) must respect this.
+- **Schema-budget audit**: 42 tools is approaching the practical limit for non-lazy-loading MCP clients; review for tools that can be consolidated or moved behind `BROWSE_MCP_TOOLS` bundles. Further additions (#40) must respect this.
 
 ### Stability
 
