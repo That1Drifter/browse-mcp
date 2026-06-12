@@ -48,10 +48,26 @@ Override with the `BROWSE_MCP_HOME` env var — the profile will live at
 - **Lateral blast radius from the agent itself.** An LLM agent driving
   browse-mcp inherits authenticated access to every site you've logged into.
   A prompt-injection payload served by one page can, in principle, pivot the
-  agent to another authenticated tab and take actions there.
+  agent to another authenticated tab and take actions there — and
+  `browser_eval` means a steered agent can run arbitrary JS in any page it
+  reaches, including authenticated ones. The hardened recipe below is the
+  countermeasure set.
 - **Leftover auth after sensitive work.** Auth survives process exit. If you
   signed into a high-value account (bank, cloud console, email) for a
   one-off task, those cookies are still on disk days later.
+
+### Stealth posture (deliberate default)
+
+By default browse-mcp strips the `navigator.webdriver` flag and sets a
+realistic user agent. This is a deliberate choice for the project's core use
+case — reading and researching real-world pages, where the `webdriver` flag
+alone triggers blocks on many ordinary sites — and it is the full extent of
+the evasion: no fingerprint spoofing, no CAPTCHA solving, no challenge
+bypass (those get handed to a human via `browser_handoff`). Some sites'
+terms of service prohibit automation that does not identify itself; whether
+the default posture is appropriate for the sites you automate is your call
+as the operator. Set `BROWSE_MCP_NO_STEALTH=1` to leave the `webdriver`
+flag intact.
 
 ### Out of scope
 
@@ -158,6 +174,25 @@ and new tabs, replacing the page with a "Blocked by origin fence"
 explanation. Only top-level (document) navigations are fenced; subresources
 (CDN scripts, images) load normally so allowed pages render correctly.
 Blocked attempts are logged to `issues.jsonl`.
+
+### 9. Hardened deployment recipe
+
+For an autonomous agent on untrusted pages, combine the knobs. Each line
+removes a capability from the prompt-injection blast radius:
+
+```sh
+BROWSE_MCP_EPHEMERAL=1                          # no persistent auth to steal
+BROWSE_MCP_ALLOWED_ORIGINS=docs.example.com     # agent cannot be steered off-site
+BROWSE_MCP_TOOLS=search,content,browser_navigate,browser_snapshot,browser_click,browser_wait_for
+                                                # no browser_eval, no live CSS edit, no handoff
+BROWSE_MCP_NO_STEALTH=1                         # identify as automation (optional)
+# and leave BROWSE_MCP_CDP unset
+```
+
+With this profile a compromised page can only influence what the agent reads
+within the allowed origins — there is no saved auth, no arbitrary JS
+execution, and no way off the allowlist. Loosen one knob at a time as the
+task requires, starting from here rather than from the permissive default.
 
 ## A note on `BROWSE_MCP_CDP`
 
