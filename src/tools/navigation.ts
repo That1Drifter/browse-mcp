@@ -2,6 +2,12 @@ import { browser } from '../browser.js';
 import { resolveRef } from '../snapshot.js';
 import { downloadUrl } from '../download.js';
 import { findByText, waitForText } from '../finder.js';
+import {
+  describeFailureContext,
+  getPageContext,
+  looksLikeChallenge,
+  HANDOFF_HINT,
+} from '../pageContext.js';
 import { text, type ToolModule } from './types.js';
 
 export const navigation: ToolModule = {
@@ -16,7 +22,8 @@ export const navigation: ToolModule = {
           wait_until: {
             type: 'string',
             enum: ['load', 'domcontentloaded', 'networkidle', 'commit'],
-            description: 'Wait condition (default: load)',
+            description:
+              'Wait condition (default: load). Avoid networkidle on modern sites — analytics/websockets often keep the network busy forever.',
           },
         },
         required: ['url'],
@@ -94,7 +101,8 @@ export const navigation: ToolModule = {
           state: {
             type: 'string',
             enum: ['load', 'domcontentloaded', 'networkidle'],
-            description: 'Load state to wait for',
+            description:
+              'Load state to wait for. Avoid networkidle on modern sites — analytics/websockets often keep the network busy forever; prefer load or a selector wait.',
           },
         },
       },
@@ -180,31 +188,9 @@ export const navigation: ToolModule = {
         throw e;
       }
       let msg = `Navigated to ${page.url()}`;
-      try {
-        const currentUrl = page.url();
-        const urlHit = /\/static-pages\/418|\/cdn-cgi\/|\/distil_r_captcha|\/_recaptcha/i.test(
-          currentUrl,
-        );
-        const bodyHit = await Promise.race([
-          page.evaluate(() => {
-            const t = (document.body?.innerText || '').toLowerCase();
-            const title = (document.title || '').toLowerCase();
-            const needles = [
-              'checking your browser',
-              'verify you are human',
-              'captcha',
-              'cloudflare',
-              'challenge',
-            ];
-            return needles.some((n) => t.includes(n) || title.includes(n));
-          }),
-          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 300)),
-        ]);
-        if (urlHit || bodyHit) {
-          msg += `\n\n[heads-up] Looks like a bot-detection / CAPTCHA interstitial. Consider browser_handoff to let the user solve it interactively.`;
-        }
-      } catch {
-        /* silent */
+      const info = await getPageContext(page, 300);
+      if (info && looksLikeChallenge(info.url, info.title, info.excerpt)) {
+        msg += `\n\n${HANDOFF_HINT}`;
       }
       return text(msg);
     },
@@ -272,9 +258,18 @@ export const navigation: ToolModule = {
     async browser_wait_for(a) {
       const page = await browser.getPage();
       const timeout = a.timeout_ms ?? 15000;
-      if (a.selector) await page.waitForSelector(a.selector, { timeout });
-      else if (a.state) await page.waitForLoadState(a.state, { timeout });
-      else await page.waitForTimeout(timeout);
+      try {
+        if (a.selector) await page.waitForSelector(a.selector, { timeout });
+        else if (a.state) await page.waitForLoadState(a.state, { timeout });
+        else await page.waitForTimeout(timeout);
+      } catch (err) {
+        const hint =
+          a.state === 'networkidle'
+            ? `\nNote: networkidle often never fires on pages with analytics/websockets/long-polling — the page may be fully usable. Prefer state:'load' or a selector wait.`
+            : '';
+        const ctx = await describeFailureContext(page);
+        throw new Error(`${(err as Error).message}${hint}${ctx}`, { cause: err });
+      }
       return text('ok');
     },
 
@@ -286,8 +281,12 @@ export const navigation: ToolModule = {
         exact: !!a.exact,
         caseSensitive: !!a.case_sensitive,
       });
-      if (!found)
-        return text(`(not found: ${JSON.stringify(a.text)}${a.role ? ` role=${a.role}` : ''})`);
+      if (!found) {
+        const ctx = await describeFailureContext(page);
+        return text(
+          `(not found: ${JSON.stringify(a.text)}${a.role ? ` role=${a.role}` : ''})${ctx}`,
+        );
+      }
       const desc = `Found <${found.tag.toLowerCase()}>${found.role ? ` role=${found.role}` : ''} "${found.text}"`;
       const action = a.action || 'info';
       const locator = found.frame.locator(found.selector);
@@ -322,7 +321,13 @@ export const navigation: ToolModule = {
     async browser_wait_for_text(a) {
       const page = await browser.getPage();
       const timeout = typeof a.timeout_ms === 'number' ? a.timeout_ms : 10000;
-      const found = await waitForText(page, { text: a.text, role: a.role }, timeout);
+      let found: Awaited<ReturnType<typeof waitForText>>;
+      try {
+        found = await waitForText(page, { text: a.text, role: a.role }, timeout);
+      } catch (err) {
+        const ctx = await describeFailureContext(page);
+        throw new Error(`${(err as Error).message}${ctx}`, { cause: err });
+      }
       await found.frame
         .evaluate(
           `(m)=>{const el=document.querySelector('[data-browse-find="'+m+'"]');if(el)el.removeAttribute('data-browse-find');}`,

@@ -8,6 +8,10 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+### Added
+- Timeout and not-found errors from `browser_wait_for`, `browser_wait_for_text`, and `browser_find_text` now append page context: current URL, `document.readyState`, title, and a 300-char body excerpt, plus the existing bot-detection heads-up when the page looks like a CAPTCHA/Cloudflare interstitial. Driven by `issues.jsonl` entries where the agent retried longer timeouts against a challenge page it could not see.
+- `networkidle` waits that time out now explain that the state often never fires on pages with analytics/websockets and suggest `load` or a selector wait; the `wait_until`/`state` schema descriptions carry the same warning.
+
 ### Fixed
 - MCP server metadata now reports the real package version (was hardcoded to `0.1.0`); the version is read from `package.json` at startup so it can no longer drift.
 - Lint is clean (was 10 errors / 7 warnings): search errors now attach the caught error as `cause`, dead code removed in `inspect.ts`/`diff.ts`, unused imports dropped, `@ts-ignore` replaced with `@ts-expect-error` where a suppression is genuinely needed.
