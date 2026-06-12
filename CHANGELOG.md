@@ -8,6 +8,12 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+### Added
+- `BROWSE_MCP_NO_STEALTH`: opt out of the `navigator.webdriver` strip for operators whose target sites' ToS expect automation to identify itself.
+
+### Fixed
+- README no longer claims Readability is "fetched from unpkg at runtime"; it has been bundled via the `@mozilla/readability` npm dependency since 0.3.0 (no runtime network fetch, works offline). Stale claim flagged by external review.
+
 ## [0.8.0] - 2026-06-12
 
 ### Added
