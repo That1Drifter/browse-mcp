@@ -1,6 +1,7 @@
 import type { Page } from 'playwright';
 import { searchWithBrowserFallback, type SearchResult } from './search.js';
 import { readArticle, formatArticle } from './read.js';
+import { isPdfUrl, fetchPdf, extractPdfText } from './pdf.js';
 
 export interface ResearchOptions {
   query: string;
@@ -38,6 +39,20 @@ export async function research(
   for (const r of results) {
     const src: ResearchSource = { title: r.title, url: r.url, snippet: r.snippet };
     try {
+      if (isPdfUrl(r.url)) {
+        // PDFs can't be read via Readability; fetch and extract text directly.
+        const pdf = await extractPdfText(await fetchPdf(r.url), {
+          maxChars: PER_SOURCE_CAP_BYTES,
+        });
+        if (!pdf.text.trim()) {
+          src.error = 'PDF contained no extractable text (likely scanned images)';
+        } else {
+          src.content = pdf.text;
+          src.truncated = pdf.truncated;
+        }
+        sources.push(src);
+        continue;
+      }
       await page.goto(r.url, { waitUntil: 'domcontentloaded', timeout: 20_000 });
       const article = await readArticle(page, { url: undefined, format });
       if (!article || (!article.content && !article.textContent)) {

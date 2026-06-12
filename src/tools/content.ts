@@ -1,5 +1,6 @@
 import { browser } from '../browser.js';
 import { readArticle, formatArticle } from '../read.js';
+import { isPdfUrl, fetchPdf, extractPdfText } from '../pdf.js';
 import { collectLinks } from '../links.js';
 import { extractListings } from '../listings.js';
 import { text, type ToolModule } from './types.js';
@@ -9,19 +10,28 @@ export const content: ToolModule = {
     {
       name: 'browser_read',
       description:
-        'Extract the main article content of the current page (or a URL) as clean Markdown using Mozilla Readability. Strips nav, ads, and chrome. Great for reading long-form articles without the noise of a full snapshot. Returns friendly error if no article was detected — fall back to browser_snapshot in that case.',
+        'Extract the main article content of the current page (or a URL) as clean Markdown using Mozilla Readability. Strips nav, ads, and chrome. Great for reading long-form articles without the noise of a full snapshot. PDFs are supported: pass a .pdf URL or a local file path (e.g. from browser_download) and the text is extracted with page markers. Returns friendly error if no article was detected — fall back to browser_snapshot in that case.',
       inputSchema: {
         type: 'object',
         properties: {
           url: {
             type: 'string',
-            description: 'Optional URL to navigate to first (waitUntil domcontentloaded)',
+            description:
+              'Optional URL to navigate to first (waitUntil domcontentloaded). A .pdf URL or local .pdf path is read directly without navigating.',
           },
           format: {
             type: 'string',
             enum: ['markdown', 'text', 'json'],
             description:
               'Output format (default: markdown). "text" = textContent only, "json" = raw parsed object.',
+          },
+          max_pages: {
+            type: 'number',
+            description: 'PDF only: max pages to extract (default 50)',
+          },
+          max_chars: {
+            type: 'number',
+            description: 'PDF only: max characters to return (default 200000)',
           },
         },
       },
@@ -83,8 +93,29 @@ export const content: ToolModule = {
   ],
   handlers: {
     async browser_read(a) {
-      const page = await browser.getPage();
       const format = (a.format as 'markdown' | 'text' | 'json') || 'markdown';
+      if (typeof a.url === 'string' && isPdfUrl(a.url)) {
+        const data = await fetchPdf(a.url);
+        const r = await extractPdfText(data, { maxPages: a.max_pages, maxChars: a.max_chars });
+        if (!r.text.trim()) {
+          return text(
+            `PDF parsed (${r.numPages} page(s)) but contained no extractable text — likely scanned images. No OCR support yet.`,
+            true,
+          );
+        }
+        if (format === 'json') {
+          return text(
+            JSON.stringify(
+              { title: r.title, url: a.url, numPages: r.numPages, pagesRead: r.pagesRead, truncated: r.truncated, text: r.text },
+              null,
+              2,
+            ),
+          );
+        }
+        const header = `# ${r.title || a.url}\n\n_PDF — ${r.pagesRead} of ${r.numPages} page(s) extracted${r.truncated ? ', truncated' : ''}_\n\n`;
+        return text(header + r.text);
+      }
+      const page = await browser.getPage();
       const article = await readArticle(page, { url: a.url, format });
       if (!article || (!article.content && !article.textContent)) {
         return text(

@@ -213,7 +213,7 @@ Bundles: `core` (nav/history/snapshot/click/type/select/eval/wait/close, 11 tool
 | Tool | What it does |
 |---|---|
 | `browser_snapshot` | Accessibility tree with `@eN` (interactive) / `@cN` (cursor-pointer) refs. Args: `selector`, `clean`, `no_collapse`, `diff`, `max_lines`, `max_depth` |
-| `browser_read` | Mozilla Readability → clean Markdown. `format`: `markdown` / `text` / `json` |
+| `browser_read` | Mozilla Readability → clean Markdown. `format`: `markdown` / `text` / `json`. Pass a `.pdf` URL or local path to extract PDF text instead (with `max_pages` / `max_chars` caps) |
 | `browser_links` | Enumerate anchors — `{text, href, ref}`. Filter by `href_pattern` (substring or `/regex/flags`), `text_pattern`, `same_origin_only`. Default skips unlabeled; `include_unlabeled` opt-in with slug fallback |
 | `browser_extract_listings` | Structured listing scrape. `group_by`: `href` (marketplace), `row` (HN/Reddit/blog), `auto`. Parses year/price/distance/location/new/used/image |
 
@@ -223,7 +223,7 @@ Bundles: `core` (nav/history/snapshot/click/type/select/eval/wait/close, 11 tool
 | `browser_search` | Web search. Tries configured API providers first (Brave, Tavily), then scrapes DuckDuckGo, then Bing, then a Playwright-rendered fallback. Works with zero config, but a free API key is recommended (see below). |
 | `browser_search_news` | News search with timestamps and source |
 | `browser_search_images` | Image search — title/image/thumbnail/dimensions/source |
-| `browser_research` | **Macro:** search → read top N → concatenated Markdown. One call. |
+| `browser_research` | **Macro:** search → read top N → concatenated Markdown. One call. PDF results are text-extracted instead of skipped. |
 
 > **Recommended: set one search API key for reliable results.** The scrape rungs (DDG/Bing) regularly get hit by Cloudflare/TLS-JA3 challenges that return the "418 teapot" / 403 interstitial to Playwright. browse-mcp falls back across rungs and logs each failure, but the most reliable path is an API key. Both options below have generous free tiers and require nothing more than an email signup:
 >
