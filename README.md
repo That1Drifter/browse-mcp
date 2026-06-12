@@ -173,7 +173,7 @@ Installing browse-mcp pulls in Playwright's bundled Chromium (~150 MB) via the `
 
 ## Schema budget
 
-All 37 tools exposed at once is roughly **4.9K tokens / 19.5 KB** of schema — about 5% of a 100K context window, before any actual work.
+All 42 tools exposed at once is roughly **5.5K tokens / 22 KB** of schema — about 5.5% of a 100K context window, before any actual work.
 
 Clients that support **lazy tool loading** (Claude Code's `ToolSearch` does) don't pay this up front. For clients that don't, restrict the exposed list via the `BROWSE_MCP_TOOLS` env var:
 
@@ -188,7 +188,7 @@ BROWSE_MCP_TOOLS=browser_navigate,browser_snapshot,browser_read,browser_search
 BROWSE_MCP_TOOLS=core,browser_research
 ```
 
-Bundles: `core` (nav/snapshot/click/type/eval/wait/close, 8 tools), `search` (4), `content` (3), `visual` (3), `debug` (6), `edit` (3), `session` (10). Omit the var to expose everything.
+Bundles: `core` (nav/history/snapshot/click/type/select/eval/wait/close, 11 tools), `search` (4), `content` (3), `visual` (3), `debug` (6), `edit` (3), `session` (12). Omit the var to expose everything.
 
 ## Tools
 
@@ -196,8 +196,12 @@ Bundles: `core` (nav/snapshot/click/type/eval/wait/close, 8 tools), `search` (4)
 | Tool | What it does |
 |---|---|
 | `browser_navigate` | Go to a URL. Auto-routes `.pdf` and `Download is starting` to `browser_download`. Suggests `browser_handoff` on captcha/Cloudflare interstitials. |
+| `browser_navigate_back` / `browser_navigate_forward` | Move through the tab history |
 | `browser_click` | Click a `@ref` or CSS selector |
 | `browser_type` | Fill an input; optional `press_enter` |
+| `browser_select_option` | Select `<select>` option(s) by value, label, or index |
+| `browser_file_upload` | Upload local files — set them on a file input, or click a chooser-opening element and feed the chooser |
+| `browser_handle_dialog` | Arm how the next `alert`/`confirm`/`prompt` is handled (accept/dismiss, prompt text), or report recent dialogs. Unarmed dialogs are auto-dismissed and recorded |
 | `browser_press_key` | Press any keyboard key |
 | `browser_hover` | Hover to trigger menus/tooltips |
 | `browser_scroll` | Scroll to element, top, or bottom |

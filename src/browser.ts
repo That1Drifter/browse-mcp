@@ -11,6 +11,7 @@ import {
 import { mkdirSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { logIssue } from './issues.js';
 
 // Ephemeral mode: no on-disk profile. Uses a fresh browser (launch) + context per run
 // so cookies/localStorage/auth never persist. Opt in with BROWSE_MCP_EPHEMERAL=1.
@@ -36,6 +37,36 @@ export interface NetworkEntry {
   tabIndex?: number;
 }
 
+export interface DialogArm {
+  action: 'accept' | 'dismiss';
+  promptText?: string;
+  remaining: number;
+}
+
+export interface DialogRecord {
+  type: string;
+  message: string;
+  handledWith: 'accept' | 'dismiss';
+  promptText?: string;
+  ts: number;
+  tabIndex?: number;
+}
+
+// Pure decision logic for an incoming dialog, kept out of the event handler so
+// it can be unit-tested. An armed instruction wins; otherwise beforeunload is
+// accepted (dismissing it cancels the navigation that triggered it) and
+// alert/confirm/prompt are dismissed, matching Playwright's no-listener default.
+export function resolveDialogAction(
+  arm: DialogArm | null,
+  dialogType: string,
+): { handledWith: 'accept' | 'dismiss'; promptText?: string; armed: boolean } {
+  if (arm && arm.remaining > 0) {
+    return { handledWith: arm.action, promptText: arm.promptText, armed: true };
+  }
+  if (dialogType === 'beforeunload') return { handledWith: 'accept', armed: false };
+  return { handledWith: 'dismiss', armed: false };
+}
+
 export const DEFAULT_DATA_DIR = process.env.BROWSE_MCP_HOME
   ? join(process.env.BROWSE_MCP_HOME, 'chromium-profile')
   : join(homedir(), '.browse-mcp', 'chromium-profile');
@@ -53,6 +84,16 @@ class BrowserManager {
   private networkLogs: WeakMap<Page, NetworkEntry[]> = new WeakMap();
   lastSnapshot: string = '';
   handoffReason: string | null = null;
+  private dialogArm: DialogArm | null = null;
+  dialogLog: DialogRecord[] = [];
+
+  armDialog(action: 'accept' | 'dismiss', promptText?: string, count = 1): void {
+    this.dialogArm = { action, promptText, remaining: Math.max(1, count) };
+  }
+
+  getDialogArm(): DialogArm | null {
+    return this.dialogArm;
+  }
 
   get consoleLog(): ConsoleEntry[] {
     if (!this.page) return [];
@@ -190,6 +231,38 @@ class BrowserManager {
       if (entry) {
         entry.status = res.status();
         entry.ok = res.ok();
+      }
+    });
+    page.on('dialog', async (dialog) => {
+      const resolved = resolveDialogAction(this.dialogArm, dialog.type());
+      if (resolved.armed && this.dialogArm) {
+        this.dialogArm.remaining -= 1;
+        if (this.dialogArm.remaining <= 0) this.dialogArm = null;
+      }
+      try {
+        if (resolved.handledWith === 'accept') await dialog.accept(resolved.promptText);
+        else await dialog.dismiss();
+      } catch {
+        /* dialog may already be gone */
+      }
+      this.dialogLog.push({
+        type: dialog.type(),
+        message: dialog.message(),
+        handledWith: resolved.handledWith,
+        promptText: resolved.promptText,
+        ts: Date.now(),
+        tabIndex: this.tabIndexOf(page),
+      });
+      if (this.dialogLog.length > 50) this.dialogLog.shift();
+      if (!resolved.armed && dialog.type() !== 'beforeunload') {
+        // Unrequested dialog auto-dismissed: feed the self-improvement loop so
+        // pages where this matters become visible.
+        void logIssue({
+          kind: 'difficulty',
+          tool: 'browser_handle_dialog',
+          note: `auto-dismissed ${dialog.type()}: ${dialog.message().slice(0, 200)}`,
+          url: page.url(),
+        }).catch(() => {});
       }
     });
   }
