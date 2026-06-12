@@ -13,6 +13,7 @@ import { edit } from './tools/edit.js';
 import { session } from './tools/session.js';
 import { issues } from './tools/issues.js';
 import { text, currentUrl, type ToolDef, type Handler, type ToolModule } from './tools/types.js';
+import { CLI_COMMANDS } from './cliArgs.js';
 
 // Resolves to the repo-root package.json from both src/ and dist/.
 const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
@@ -125,6 +126,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 });
 
 async function main() {
+  // CLI mode: `browse-mcp read|search|research ...` — see src/cli.ts (#41).
+  // No args (or unknown first arg) = MCP server over stdio, as before.
+  const first = process.argv[2];
+  if (first && CLI_COMMANDS.has(first)) {
+    const { runCli } = await import('./cli.js');
+    await runCli(process.argv.slice(2));
+    return;
+  }
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

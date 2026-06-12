@@ -45,8 +45,8 @@ The goal for 1.0 is a stable tool API, a documented semver contract, and enough 
 
 Not committed, but on the radar:
 
-- **Thin CLI entry point** ([#41](https://github.com/That1Drifter/browse-mcp/issues/41)): the ecosystem is drifting toward CLI-first agent tooling for token efficiency (Microsoft cites ~114k tokens per task via MCP vs ~27k via their companion CLI); a small CLI over the same core could serve shell-capable agents.
 - Structured extraction helpers beyond `browser_extract_listings` (table extraction, schema.org parsing).
+- Extending the CLI (shipped post-0.7.0 with read/search/research per #41) to interactive commands if demand shows up.
 - A minimal benchmark comparing research-macro output quality against a plain search+fetch loop.
 - Self-hosted SearXNG instructions for users who want zero-API-key reliability and have infra to spare.
 
