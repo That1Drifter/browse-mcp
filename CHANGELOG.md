@@ -8,6 +8,10 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+### Changed
+- Repositioned as client-agnostic: README and package metadata no longer frame the server as Claude-specific. Added registration instructions for Codex CLI, Gemini CLI, Cursor, and VS Code alongside Claude Code / Claude Desktop, plus a platform-support matrix (Windows / Linux / macOS) documenting the Linux `playwright install-deps` step and the display requirement for `browser_handoff`.
+- CI now builds and tests on Windows and macOS in addition to Ubuntu.
+
 ## [0.4.1] - 2026-05-27
 
 ### Fixed

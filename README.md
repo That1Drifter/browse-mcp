@@ -4,7 +4,7 @@
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](https://nodejs.org)
 
-A headless-browser MCP server for Claude (or any MCP client). Playwright-based, with accessibility-tree refs, Readability article extraction, search without an API key, a research macro that bundles search-and-read into one call, annotated screenshots, and a self-improvement feedback loop.
+A headless-browser MCP server for any MCP-capable agent: Claude Code/Desktop, Codex CLI, Gemini CLI, Cursor, VS Code, or anything else that speaks [MCP](https://modelcontextprotocol.io) over stdio. Playwright-based, with accessibility-tree refs, Readability article extraction, search without an API key, a research macro that bundles search-and-read into one call, annotated screenshots, and a self-improvement feedback loop. Runs on Windows, Linux, and macOS.
 
 ## Project status
 
@@ -54,19 +54,82 @@ npm install
 npm run build
 ```
 
-## Register with Claude Code
+## Platform support
+
+| OS | Status |
+|---|---|
+| Windows 10/11 | Supported (primary development platform) |
+| Linux | Supported. Headless by default, so it works on servers with no display. On minimal distros, run `npx playwright install-deps chromium` once to pull the shared libraries Chromium needs. `browser_handoff` opens a visible browser window, so it requires a desktop session; everything else works displayless. |
+| macOS | Supported (CI-verified) |
+
+The server itself is plain Node ≥ 18 with no platform-specific code; data lives under `~/.browse-mcp/` on every OS (override with `BROWSE_MCP_HOME`).
+
+## Register with your MCP client
+
+browse-mcp is a standard stdio MCP server with no client-specific features. Any client boils down to the same config: command `npx`, args `["-y", "browse-mcp"]` (or `node /absolute/path/to/browse-mcp/dist/index.js` for a local checkout).
+
+### Claude Code
 
 ```bash
 claude mcp add browse -- npx -y browse-mcp
 ```
 
-Or, for a local checkout:
+### Codex CLI
 
 ```bash
-claude mcp add browse -- node /absolute/path/to/browse-mcp/dist/index.js
+codex mcp add browse -- npx -y browse-mcp
 ```
 
-## Register with Claude Desktop
+### Gemini CLI
+
+```bash
+gemini mcp add browse npx -y browse-mcp
+```
+
+Or add to `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "browse": {
+      "command": "npx",
+      "args": ["-y", "browse-mcp"]
+    }
+  }
+}
+```
+
+### Cursor
+
+Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (per-project):
+
+```json
+{
+  "mcpServers": {
+    "browse": {
+      "command": "npx",
+      "args": ["-y", "browse-mcp"]
+    }
+  }
+}
+```
+
+### VS Code (Copilot agent mode)
+
+Add to `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "browse": {
+      "command": "npx",
+      "args": ["-y", "browse-mcp"]
+    }
+  }
+}
+```
+
+### Claude Desktop
 
 Edit the config file (create it if it doesn't exist):
 
@@ -200,12 +263,12 @@ Bundles: `core` (nav/snapshot/click/type/eval/wait/close, 8 tools), `search` (4)
 ### Self-improvement loop
 | Tool | What it does |
 |---|---|
-| `browser_report_difficulty` | Claude logs friction or missing features to `~/.browse-mcp/issues.jsonl` |
+| `browser_report_difficulty` | The agent logs friction or missing features to `~/.browse-mcp/issues.jsonl` |
 | `browser_review_issues` | Read back auto-logged errors + reported difficulties |
 
 ## Self-improvement loop
 
-Every tool error is auto-logged to `~/.browse-mcp/issues.jsonl` with the tool name, arguments, message, and current URL. Claude is prompted (via the `browser_report_difficulty` description) to log subtler friction — ref mismatches, noisy snapshots, retries, missing capabilities — even when no error fired.
+Every tool error is auto-logged to `~/.browse-mcp/issues.jsonl` with the tool name, arguments, message, and current URL. The agent is prompted (via the `browser_report_difficulty` description) to log subtler friction — ref mismatches, noisy snapshots, retries, missing capabilities — even when no error fired.
 
 At session start, an agent can run `browser_review_issues` to see known rough edges. Hand the log to a coding agent later to drive the next round of improvements.
 
