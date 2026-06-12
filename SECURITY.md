@@ -134,6 +134,26 @@ tools today, but it's the pattern to reach for if the default persistent
 profile is too broad for your threat model. See the Playwright docs on
 [authentication](https://playwright.dev/docs/auth) for details.
 
+### 8. Origin fence for autonomous agents
+
+Page content can steer an autonomous agent toward arbitrary URLs (prompt
+injection via links). Two env vars restrict where the browser may navigate:
+
+```sh
+# Allowlist: only these hosts (and their subdomains) are reachable
+BROWSE_MCP_ALLOWED_ORIGINS=example.com,docs.python.org
+
+# Blocklist: these hosts are refused even if allowed elsewhere
+BROWSE_MCP_BLOCKED_ORIGINS=accounts.google.com
+```
+
+`browser_navigate` refuses fenced URLs with a clear message, and a
+context-level route backstop catches redirects, JS-initiated navigations,
+and new tabs, replacing the page with a "Blocked by origin fence"
+explanation. Only top-level (document) navigations are fenced; subresources
+(CDN scripts, images) load normally so allowed pages render correctly.
+Blocked attempts are logged to `issues.jsonl`.
+
 ## Quick decision guide
 
 | Situation | Recommended setting |

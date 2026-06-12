@@ -15,6 +15,8 @@ as described in [VERSIONING.md](./VERSIONING.md).
 - `browser_navigate_back` / `browser_navigate_forward`: tab history navigation (#35).
 - Bundles updated: `core` gains back/forward/select_option (11 tools), `session` gains file_upload/handle_dialog (12 tools).
 - `browser_drag`: drag one element onto another via mouse-based drag (covers HTML5 drag-and-drop and sortable lists); completes #35. Lives in the `session` bundle (13 tools).
+- Proxy support (#37): `BROWSE_MCP_PROXY` (`http://`, `http://user:pass@`, `socks5://`) and `BROWSE_MCP_PROXY_BYPASS` are passed through to Chromium.
+- Origin fence (#37): `BROWSE_MCP_ALLOWED_ORIGINS` / `BROWSE_MCP_BLOCKED_ORIGINS` restrict top-level navigation (host + subdomain matching, blocklist wins). `browser_navigate` refuses fenced URLs with a clear message; a context route backstop catches redirects, JS navigations, and new tabs and replaces the page with a "Blocked by origin fence" explanation. Blocked attempts are logged to issues.jsonl. New README "Configuration" section consolidates all env vars.
 - PDF text extraction (#36): `browser_read` accepts a `.pdf` URL or local file path (e.g. the path `browser_download` reported) and returns the text with per-page markers, document title, and `max_pages` / `max_chars` caps (default 50 pages / 200k chars). `browser_research` extracts text from PDF results instead of skipping them. Scanned/image-only PDFs return a clear "no extractable text" error (no OCR). Uses `pdfjs-dist`, loaded lazily on first use.
 
 ## [0.5.0] - 2026-06-12
