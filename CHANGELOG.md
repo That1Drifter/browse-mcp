@@ -8,6 +8,8 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-12
+
 ### Added
 - CLI mode (#41): `npx browse-mcp read|search|research ...` runs the same core as the MCP tools but writes results to stdout — token-light path for shell-capable agents. `read` handles HTML (Readability) and PDFs; `search` covers web/news/images with `--json`; `research` emits the concatenated document. Attaches to a running server's browser when it was started with `BROWSE_MCP_CDP` (localhost CDP port + discovery file, opt-in, security note in SECURITY.md); otherwise launches its own browser on the shared profile, ephemeral when locked. No args still starts the MCP server, so existing client configs are unaffected.
 
