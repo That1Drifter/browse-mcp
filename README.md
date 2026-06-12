@@ -205,7 +205,24 @@ All configuration is via env vars on the server process:
 | `BROWSE_MCP_ALLOWED_ORIGINS` | Allowlist of hosts (plus subdomains) the browser may navigate to; everything else is refused |
 | `BROWSE_MCP_BLOCKED_ORIGINS` | Hosts the browser must never navigate to (wins over the allowlist) |
 
+| `BROWSE_MCP_CDP` | Opt-in: expose the browser's CDP endpoint on localhost (`1` = port 9223, or a port number) so the CLI can attach to the live session. **Any local process can drive the browser through this port** — see [SECURITY.md](./SECURITY.md) |
+
 The origin fence applies to top-level navigations only (subresources load normally), covers redirects/JS navigations/new tabs via a route backstop, and logs blocked attempts to `issues.jsonl` — see [SECURITY.md](./SECURITY.md) for the threat model.
+
+## CLI
+
+The same binary doubles as a CLI for the token-heavy read-only operations, so shell-capable agents can skip MCP tool-call overhead entirely:
+
+```bash
+npx browse-mcp read <url>                # Readability markdown; .pdf URLs/paths get PDF text extraction
+npx browse-mcp search "query" --max 5    # provider-chain web search (--news / --images / --json)
+npx browse-mcp research "query"          # search + read top N -> one concatenated document
+npx browse-mcp help                      # all flags
+```
+
+Results go to stdout, diagnostics to stderr, non-zero exit on failure.
+
+Session model: if a browse-mcp server is running and was started with `BROWSE_MCP_CDP=1`, the CLI attaches to its live browser (same auth, same origin fence) and detaches when done. Otherwise it launches its own headless browser on the shared profile, falling back to an ephemeral context when the profile is locked by another instance.
 
 ## Tools
 

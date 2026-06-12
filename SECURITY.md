@@ -159,6 +159,16 @@ explanation. Only top-level (document) navigations are fenced; subresources
 (CDN scripts, images) load normally so allowed pages render correctly.
 Blocked attempts are logged to `issues.jsonl`.
 
+## A note on `BROWSE_MCP_CDP`
+
+Setting `BROWSE_MCP_CDP` opens Chromium's DevTools protocol on a localhost
+port so the CLI can attach to the running session. CDP grants **full browser
+control** — cookies, auth, navigation, script execution — to any process on
+the machine that can reach the port. The origin fence still applies to pages
+inside browse-mcp's contexts, but a CDP client could open its own context.
+Leave it unset unless you use the CLI attach flow, and never set it on a
+multi-user machine.
+
 ## Quick decision guide
 
 | Situation | Recommended setting |

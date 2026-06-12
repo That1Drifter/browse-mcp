@@ -8,7 +8,7 @@ import {
   Response,
   CDPSession,
 } from 'playwright';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, writeFileSync, rmSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { logIssue } from './issues.js';
@@ -79,9 +79,21 @@ export function navigationBlockReason(url: string): string | null {
   return v.allowed ? null : (v.reason ?? 'blocked by origin fence');
 }
 
-export const DEFAULT_DATA_DIR = process.env.BROWSE_MCP_HOME
-  ? join(process.env.BROWSE_MCP_HOME, 'chromium-profile')
-  : join(homedir(), '.browse-mcp', 'chromium-profile');
+export const HOME_DIR = process.env.BROWSE_MCP_HOME || join(homedir(), '.browse-mcp');
+
+export const DEFAULT_DATA_DIR = join(HOME_DIR, 'chromium-profile');
+
+// BROWSE_MCP_CDP: opt-in localhost CDP endpoint so the CLI (and other local
+// tooling) can attach to the live browser. '1'/'true' -> 9223, or a port.
+// SECURITY: any local process can drive the browser through this port.
+const CDP_PORT = (() => {
+  const v = (process.env.BROWSE_MCP_CDP ?? '').trim().toLowerCase();
+  if (!v) return 0;
+  if (v === '1' || v === 'true' || v === 'yes') return 9223;
+  const n = parseInt(v, 10);
+  return Number.isInteger(n) && n > 0 && n < 65536 ? n : 0;
+})();
+export const CDP_FILE = join(HOME_DIR, 'cdp.json');
 
 class BrowserManager {
   private context: BrowserContext | null = null;
@@ -101,6 +113,7 @@ class BrowserManager {
   private extraContexts: Map<string, BrowserContext> = new Map();
   private activeContextName = 'default';
   private isolatedBrowser: Browser | null = null;
+  private wroteCdpFile = false;
 
   armDialog(action: 'accept' | 'dismiss', promptText?: string, count = 1): void {
     this.dialogArm = { action, promptText, remaining: Math.max(1, count) };
@@ -203,17 +216,30 @@ class BrowserManager {
   private async ensureDefaultContext(): Promise<BrowserContext> {
     if (this.context) return this.context;
     const contextOpts = this.buildContextOpts();
+    const launchArgs = CDP_PORT ? { args: [`--remote-debugging-port=${CDP_PORT}`] } : {};
     if (this.ephemeral) {
-      this.browser = await chromium.launch({ headless: this.mode === 'headless' });
+      this.browser = await chromium.launch({ headless: this.mode === 'headless', ...launchArgs });
       this.context = await this.browser.newContext(contextOpts);
     } else {
       if (!existsSync(this.dataDir)) mkdirSync(this.dataDir, { recursive: true });
       this.context = await chromium.launchPersistentContext(this.dataDir, {
         headless: this.mode === 'headless',
+        ...launchArgs,
         ...contextOpts,
       });
     }
     await this.applyContextPolicies(this.context);
+    if (CDP_PORT) {
+      try {
+        if (!existsSync(HOME_DIR)) mkdirSync(HOME_DIR, { recursive: true });
+        writeFileSync(CDP_FILE, JSON.stringify({ port: CDP_PORT, pid: process.pid }), {
+          mode: 0o600,
+        });
+        this.wroteCdpFile = true;
+      } catch {
+        /* discovery file is best-effort */
+      }
+    }
     return this.context;
   }
 
@@ -417,6 +443,14 @@ class BrowserManager {
 
   private async closeInternal() {
     this.cdp = null;
+    if (this.wroteCdpFile) {
+      try {
+        rmSync(CDP_FILE, { force: true });
+      } catch {
+        /* best-effort */
+      }
+      this.wroteCdpFile = false;
+    }
     for (const ctx of this.extraContexts.values()) {
       await ctx.close().catch(() => {});
     }
