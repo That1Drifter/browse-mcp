@@ -29,7 +29,7 @@ export async function downloadUrl(
 ): Promise<DownloadResult> {
   // Back-compat: older callers pass (page, url, saveDir).
   let saveDir: string | undefined;
-  let forceFetch = false;
+  let forceFetch: boolean;
   if (typeof saveDirOrOpts === 'string' || saveDirOrOpts === undefined) {
     saveDir = saveDirOrOpts as string | undefined;
     forceFetch = !!forceFetchArg;

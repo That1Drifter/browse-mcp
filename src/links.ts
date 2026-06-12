@@ -1,4 +1,4 @@
-import type { Page, Frame } from 'playwright';
+import type { Page } from 'playwright';
 
 export interface LinksOptions {
   hrefPattern?: string; // substring OR /regex/flags literal
@@ -130,7 +130,7 @@ export async function collectLinks(page: Page, opts: LinksOptions): Promise<Link
         continue;
       }
     }
-    let items: LinkInfo[] = [];
+    let items: LinkInfo[];
     try {
       items = (await frame.evaluate(
         `(${COLLECT_FN})(${JSON.stringify({

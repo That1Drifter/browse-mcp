@@ -1,4 +1,4 @@
-import type { Page, Frame, ElementHandle } from 'playwright';
+import type { Page, Frame } from 'playwright';
 
 export interface FindOptions {
   text: string;

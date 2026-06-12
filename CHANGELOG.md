@@ -8,6 +8,10 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+### Fixed
+- MCP server metadata now reports the real package version (was hardcoded to `0.1.0`); the version is read from `package.json` at startup so it can no longer drift.
+- Lint is clean (was 10 errors / 7 warnings): search errors now attach the caught error as `cause`, dead code removed in `inspect.ts`/`diff.ts`, unused imports dropped, `@ts-ignore` replaced with `@ts-expect-error` where a suppression is genuinely needed.
+
 ### Changed
 - Repositioned as client-agnostic: README and package metadata no longer frame the server as Claude-specific. Added registration instructions for Codex CLI, Gemini CLI, Cursor, and VS Code alongside Claude Code / Claude Desktop, plus a platform-support matrix (Windows / Linux / macOS) documenting the Linux `playwright install-deps` step and the display requirement for `browser_handoff`.
 - CI now builds and tests on Windows and macOS in addition to Ubuntu.

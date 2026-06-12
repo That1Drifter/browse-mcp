@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createRequire } from 'module';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -13,10 +14,10 @@ import { session } from './tools/session.js';
 import { issues } from './tools/issues.js';
 import { text, currentUrl, type ToolDef, type Handler, type ToolModule } from './tools/types.js';
 
-const server = new Server(
-  { name: 'browse-mcp', version: '0.1.0' },
-  { capabilities: { tools: {} } },
-);
+// Resolves to the repo-root package.json from both src/ and dist/.
+const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
+
+const server = new Server({ name: 'browse-mcp', version }, { capabilities: { tools: {} } });
 
 // Merge per-category modules into flat tool list + handler map.
 const MODULES: ToolModule[] = [

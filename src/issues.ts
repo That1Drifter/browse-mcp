@@ -1,7 +1,7 @@
 import { appendFile, mkdir, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
-import { join, dirname } from 'path';
+import { join } from 'path';
 
 const LOG_DIR = process.env.BROWSE_MCP_HOME || join(homedir(), '.browse-mcp');
 const LOG_FILE = join(LOG_DIR, 'issues.jsonl');
