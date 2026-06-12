@@ -65,6 +65,49 @@ export const navigation: ToolModule = {
       },
     },
     {
+      name: 'browser_click_xy',
+      description:
+        'Click at viewport pixel coordinates. Fallback for canvas/map/game pages whose accessibility tree is empty — coordinates match browser_screenshot output (default viewport 1280x720). Prefer ref/selector clicks when the element is in the snapshot.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          x: { type: 'number', description: 'X in CSS pixels from the left edge' },
+          y: { type: 'number', description: 'Y in CSS pixels from the top edge' },
+          button: { type: 'string', enum: ['left', 'right', 'middle'], description: 'Default left' },
+          click_count: { type: 'number', description: '2 = double-click (default 1)' },
+        },
+        required: ['x', 'y'],
+      },
+    },
+    {
+      name: 'browser_move_xy',
+      description: 'Move the mouse to viewport pixel coordinates (hover without clicking).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          x: { type: 'number', description: 'X in CSS pixels' },
+          y: { type: 'number', description: 'Y in CSS pixels' },
+        },
+        required: ['x', 'y'],
+      },
+    },
+    {
+      name: 'browser_drag_xy',
+      description:
+        'Press at one viewport coordinate, drag to another, release. For canvas interactions (drawing, map panning, sliders) where element-based browser_drag cannot target anything.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          from_x: { type: 'number' },
+          from_y: { type: 'number' },
+          to_x: { type: 'number' },
+          to_y: { type: 'number' },
+          steps: { type: 'number', description: 'Intermediate mouse moves (default 10)' },
+        },
+        required: ['from_x', 'from_y', 'to_x', 'to_y'],
+      },
+    },
+    {
       name: 'browser_drag',
       description:
         'Drag one element onto another (mouse-based drag; works for HTML5 drag-and-drop and sortable lists). Both ends accept a @ref or CSS selector.',
@@ -313,6 +356,30 @@ export const navigation: ToolModule = {
       await page.goForward();
       if (page.url() === before) return text('(no forward history)');
       return text(`Went forward to ${page.url()}`);
+    },
+
+    async browser_click_xy(a) {
+      const page = await browser.getPage();
+      await page.mouse.click(a.x, a.y, {
+        button: a.button || 'left',
+        clickCount: a.click_count ?? 1,
+      });
+      return text(`Clicked at (${a.x}, ${a.y})${a.button && a.button !== 'left' ? ` [${a.button}]` : ''}`);
+    },
+
+    async browser_move_xy(a) {
+      const page = await browser.getPage();
+      await page.mouse.move(a.x, a.y);
+      return text(`Moved mouse to (${a.x}, ${a.y})`);
+    },
+
+    async browser_drag_xy(a) {
+      const page = await browser.getPage();
+      await page.mouse.move(a.from_x, a.from_y);
+      await page.mouse.down();
+      await page.mouse.move(a.to_x, a.to_y, { steps: a.steps ?? 10 });
+      await page.mouse.up();
+      return text(`Dragged from (${a.from_x}, ${a.from_y}) to (${a.to_x}, ${a.to_y})`);
     },
 
     async browser_drag(a) {

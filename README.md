@@ -188,7 +188,7 @@ BROWSE_MCP_TOOLS=browser_navigate,browser_snapshot,browser_read,browser_search
 BROWSE_MCP_TOOLS=core,browser_research
 ```
 
-Bundles: `core` (nav/history/snapshot/click/type/select/eval/wait/close, 11 tools), `search` (4), `content` (3), `visual` (3), `debug` (6), `edit` (3), `session` (15). Omit the var to expose everything.
+Bundles: `core` (nav/history/snapshot/click/type/select/eval/wait/close, 11 tools), `search` (4), `content` (3), `visual` (3), `debug` (6), `edit` (3), `session` (15), `vision` (3 coordinate tools, **opt-in only**). Omit the var to expose everything except `vision`; the coordinate tools must be requested explicitly (`BROWSE_MCP_TOOLS=vision` or by name) so they never cost schema budget unless wanted.
 
 ## Configuration
 
@@ -222,6 +222,7 @@ The origin fence applies to top-level navigations only (subresources load normal
 | `browser_press_key` | Press any keyboard key |
 | `browser_hover` | Hover to trigger menus/tooltips |
 | `browser_drag` | Drag one element onto another (mouse-based; covers HTML5 drag-and-drop and sortable lists) |
+| `browser_click_xy` / `browser_move_xy` / `browser_drag_xy` | Coordinate-based mouse for canvas/map/game pages with empty accessibility trees. **Opt-in** — not exposed by default; enable with `BROWSE_MCP_TOOLS=vision` (plus whatever bundles you need) |
 | `browser_scroll` | Scroll to element, top, or bottom |
 | `browser_find_text` / `browser_wait_for_text` | Find or wait for elements by visible text — pierces shadow DOM and iframes |
 | `browser_wait_for` | Wait for selector / load state / timeout |
