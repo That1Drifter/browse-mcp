@@ -65,6 +65,19 @@ export const navigation: ToolModule = {
       },
     },
     {
+      name: 'browser_drag',
+      description:
+        'Drag one element onto another (mouse-based drag; works for HTML5 drag-and-drop and sortable lists). Both ends accept a @ref or CSS selector.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          source: { type: 'string', description: '@ref or CSS selector to drag' },
+          target: { type: 'string', description: '@ref or CSS selector to drop onto' },
+        },
+        required: ['source', 'target'],
+      },
+    },
+    {
       name: 'browser_select_option',
       description:
         'Select option(s) in a <select> element by value, label, or index. Returns the values actually selected.',
@@ -293,6 +306,16 @@ export const navigation: ToolModule = {
       await page.goForward();
       if (page.url() === before) return text('(no forward history)');
       return text(`Went forward to ${page.url()}`);
+    },
+
+    async browser_drag(a) {
+      const page = await browser.getPage();
+      const resolve = async (t: string) =>
+        t.startsWith('@') ? (await resolveRef(page, t)).locator : page.locator(t).first();
+      const source = await resolve(a.source);
+      const target = await resolve(a.target);
+      await source.dragTo(target);
+      return text(`Dragged ${a.source} onto ${a.target}`);
     },
 
     async browser_select_option(a) {

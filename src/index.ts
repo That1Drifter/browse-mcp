@@ -77,6 +77,7 @@ const TOOL_BUNDLES: Record<string, string[]> = {
     'browser_wait_for_text',
     'browser_file_upload',
     'browser_handle_dialog',
+    'browser_drag',
   ],
 };
 function filterTools(all: ToolDef[]): ToolDef[] {
