@@ -14,6 +14,7 @@ as described in [VERSIONING.md](./VERSIONING.md).
 - `browser_file_upload`: set local files on a file input directly, or click a chooser-opening element and feed the file chooser (#35).
 - `browser_navigate_back` / `browser_navigate_forward`: tab history navigation (#35).
 - Bundles updated: `core` gains back/forward/select_option (11 tools), `session` gains file_upload/handle_dialog (12 tools).
+- PDF text extraction (#36): `browser_read` accepts a `.pdf` URL or local file path (e.g. the path `browser_download` reported) and returns the text with per-page markers, document title, and `max_pages` / `max_chars` caps (default 50 pages / 200k chars). `browser_research` extracts text from PDF results instead of skipping them. Scanned/image-only PDFs return a clear "no extractable text" error (no OCR). Uses `pdfjs-dist`, loaded lazily on first use.
 
 ## [0.5.0] - 2026-06-12
 

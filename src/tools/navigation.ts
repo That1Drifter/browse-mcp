@@ -255,7 +255,7 @@ export const navigation: ToolModule = {
       if (typeof url === 'string' && /\.pdf(\?.*)?$/i.test(url)) {
         const result = await downloadUrl(page, url);
         return text(
-          `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). Use browser_download to fetch directly next time.`,
+          `Detected download — saved to ${result.path} (${result.sizeBytes} bytes). To extract its text, call browser_read with url set to that path (or to the original URL).`,
         );
       }
       try {
