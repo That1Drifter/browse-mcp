@@ -173,7 +173,7 @@ Installing browse-mcp pulls in Playwright's bundled Chromium (~150 MB) via the `
 
 ## Schema budget
 
-All 45 tools exposed at once is roughly **5.9K tokens / 24 KB** of schema — about 6% of a 100K context window, before any actual work.
+All 46 default tools exposed at once is roughly **6.1K tokens / 24.5 KB** of schema — about 6% of a 100K context window, before any actual work.
 
 Clients that support **lazy tool loading** (Claude Code's `ToolSearch` does) don't pay this up front. For clients that don't, restrict the exposed list via the `BROWSE_MCP_TOOLS` env var:
 
@@ -188,7 +188,7 @@ BROWSE_MCP_TOOLS=browser_navigate,browser_snapshot,browser_read,browser_search
 BROWSE_MCP_TOOLS=core,browser_research
 ```
 
-Bundles: `core` (nav/history/snapshot/click/type/select/eval/wait/close, 11 tools), `search` (4), `content` (3), `visual` (3), `debug` (6), `edit` (3), `session` (15), `vision` (3 coordinate tools, **opt-in only**). Omit the var to expose everything except `vision`; the coordinate tools must be requested explicitly (`BROWSE_MCP_TOOLS=vision` or by name) so they never cost schema budget unless wanted.
+Bundles: `core` (nav/history/snapshot/click/type/select/eval/wait/close, 11 tools), `search` (4), `content` (3), `visual` (3), `debug` (6), `edit` (3), `session` (16), `vision` (3 coordinate tools, **opt-in only**). Omit the var to expose everything except `vision`; the coordinate tools must be requested explicitly (`BROWSE_MCP_TOOLS=vision` or by name) so they never cost schema budget unless wanted.
 
 ## Configuration
 
@@ -282,6 +282,7 @@ The origin fence applies to top-level navigations only (subresources load normal
 | `browser_handoff` / `browser_resume` | Hand current page to a visible Chrome for CAPTCHA/MFA, then back to headless. Persistent profile — auth survives sessions |
 | `browser_download` | Save attachment downloads. `force_fetch: true` falls back to raw HTTP for plain files |
 | `browser_save_state` / `browser_load_state` | Export/import cookies + localStorage as JSON — move auth between machines without copying the whole profile. The file contains live session tokens; treat it like a password file |
+| `browser_context` | Open/switch/close/list isolated incognito-style contexts that share nothing with the persistent profile. In-memory only; lost on close/handoff. Pair with `browser_load_state` to inject scoped auth |
 | `browser_reset_profile` | Nuke the persistent Chromium profile. Requires `confirm: true` |
 
 ### Self-improvement loop

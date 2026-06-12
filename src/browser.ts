@@ -98,6 +98,9 @@ class BrowserManager {
   handoffReason: string | null = null;
   private dialogArm: DialogArm | null = null;
   dialogLog: DialogRecord[] = [];
+  private extraContexts: Map<string, BrowserContext> = new Map();
+  private activeContextName = 'default';
+  private isolatedBrowser: Browser | null = null;
 
   armDialog(action: 'accept' | 'dismiss', promptText?: string, count = 1): void {
     this.dialogArm = { action, promptText, remaining: Math.max(1, count) };
@@ -143,73 +146,159 @@ class BrowserManager {
   }
 
   private tabIndexOf(page: Page): number {
-    if (!this.context) return -1;
-    return this.context.pages().indexOf(page);
+    return page.context().pages().indexOf(page);
+  }
+
+  private buildContextOpts() {
+    return {
+      viewport: { width: 1280, height: 720 },
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      locale: 'en-US',
+      timezoneId: 'America/Chicago',
+      extraHTTPHeaders: {
+        'Accept-Language': 'en-US,en;q=0.9',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      },
+      ...(PROXY ? { proxy: PROXY } : {}),
+    };
+  }
+
+  // Stealth + origin fence apply to every context (default and isolated alike).
+  private async applyContextPolicies(ctx: BrowserContext): Promise<void> {
+    // Soft stealth: remove the `navigator.webdriver` tell that WAFs check for
+    await ctx.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    });
+    // Origin fence backstop: abort disallowed top-level navigations that
+    // bypass browser_navigate's pre-check (redirects, JS navs, new tabs).
+    // Subresources (CDN scripts, images) are not fenced or pages would break.
+    if (FENCE_ACTIVE) {
+      await ctx.route('**/*', (route) => {
+        const req = route.request();
+        if (req.isNavigationRequest() && req.resourceType() === 'document') {
+          const v = checkUrlAllowed(req.url(), FENCE);
+          if (!v.allowed) {
+            void logIssue({
+              kind: 'difficulty',
+              tool: 'origin-fence',
+              note: `blocked navigation: ${v.reason}`,
+              url: req.url(),
+            });
+            // Fulfill with an explanation instead of aborting so the agent
+            // sees why, not an opaque chrome-error:// page.
+            return route.fulfill({
+              status: 403,
+              contentType: 'text/html',
+              body: `<html><head><title>Blocked by origin fence</title></head><body><h1>Blocked by origin fence</h1><p>${v.reason}. This browse-mcp server restricts navigation via BROWSE_MCP_ALLOWED_ORIGINS / BROWSE_MCP_BLOCKED_ORIGINS. Do not retry this URL.</p></body></html>`,
+            });
+          }
+        }
+        return route.continue();
+      });
+    }
+  }
+
+  private async ensureDefaultContext(): Promise<BrowserContext> {
+    if (this.context) return this.context;
+    const contextOpts = this.buildContextOpts();
+    if (this.ephemeral) {
+      this.browser = await chromium.launch({ headless: this.mode === 'headless' });
+      this.context = await this.browser.newContext(contextOpts);
+    } else {
+      if (!existsSync(this.dataDir)) mkdirSync(this.dataDir, { recursive: true });
+      this.context = await chromium.launchPersistentContext(this.dataDir, {
+        headless: this.mode === 'headless',
+        ...contextOpts,
+      });
+    }
+    await this.applyContextPolicies(this.context);
+    return this.context;
+  }
+
+  private async ensureActiveContext(): Promise<BrowserContext> {
+    const def = await this.ensureDefaultContext();
+    if (this.activeContextName === 'default') return def;
+    const ctx = this.extraContexts.get(this.activeContextName);
+    if (ctx) return ctx;
+    // Context vanished (closed externally) — fall back to default.
+    this.activeContextName = 'default';
+    return def;
   }
 
   async getPage(): Promise<Page> {
-    if (this.page && !this.page.isClosed()) return this.page;
-    if (!this.context) {
-      const contextOpts = {
-        viewport: { width: 1280, height: 720 },
-        userAgent:
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        locale: 'en-US',
-        timezoneId: 'America/Chicago',
-        extraHTTPHeaders: {
-          'Accept-Language': 'en-US,en;q=0.9',
-          Accept:
-            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        },
-        ...(PROXY ? { proxy: PROXY } : {}),
-      };
-      if (this.ephemeral) {
-        this.browser = await chromium.launch({ headless: this.mode === 'headless' });
-        this.context = await this.browser.newContext(contextOpts);
-      } else {
-        if (!existsSync(this.dataDir)) mkdirSync(this.dataDir, { recursive: true });
-        this.context = await chromium.launchPersistentContext(this.dataDir, {
-          headless: this.mode === 'headless',
-          ...contextOpts,
-        });
-      }
-      // Soft stealth: remove the `navigator.webdriver` tell that WAFs check for
-      await this.context.addInitScript(() => {
-        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-      });
-      // Origin fence backstop: abort disallowed top-level navigations that
-      // bypass browser_navigate's pre-check (redirects, JS navs, new tabs).
-      // Subresources (CDN scripts, images) are not fenced or pages would break.
-      if (FENCE_ACTIVE) {
-        await this.context.route('**/*', (route) => {
-          const req = route.request();
-          if (req.isNavigationRequest() && req.resourceType() === 'document') {
-            const v = checkUrlAllowed(req.url(), FENCE);
-            if (!v.allowed) {
-              void logIssue({
-                kind: 'difficulty',
-                tool: 'origin-fence',
-                note: `blocked navigation: ${v.reason}`,
-                url: req.url(),
-              });
-              // Fulfill with an explanation instead of aborting so the agent
-              // sees why, not an opaque chrome-error:// page.
-              return route.fulfill({
-                status: 403,
-                contentType: 'text/html',
-                body: `<html><head><title>Blocked by origin fence</title></head><body><h1>Blocked by origin fence</h1><p>${v.reason}. This browse-mcp server restricts navigation via BROWSE_MCP_ALLOWED_ORIGINS / BROWSE_MCP_BLOCKED_ORIGINS. Do not retry this URL.</p></body></html>`,
-              });
-            }
-          }
-          return route.continue();
-        });
-      }
-    }
-    // Reuse existing page if present, else create one
-    const existing = this.context.pages();
-    this.page = existing.length ? existing[0] : await this.context.newPage();
+    const ctx = await this.ensureActiveContext();
+    if (this.page && !this.page.isClosed() && this.page.context() === ctx) return this.page;
+    const existing = ctx.pages();
+    this.page = existing.length ? existing[0] : await ctx.newPage();
     this.attachLoggers(this.page);
     return this.page;
+  }
+
+  async openIsolatedContext(name: string): Promise<void> {
+    if (name === 'default' || this.extraContexts.has(name)) {
+      throw new Error(`Context ${JSON.stringify(name)} already exists`);
+    }
+    await this.ensureDefaultContext();
+    // launchPersistentContext exposes no Browser in some Playwright versions;
+    // fall back to a dedicated lightweight browser for isolated contexts.
+    const b =
+      this.browser ??
+      this.context!.browser() ??
+      (this.isolatedBrowser ??= await chromium.launch({ headless: this.mode === 'headless' }));
+    const ctx = await b.newContext(this.buildContextOpts());
+    await this.applyContextPolicies(ctx);
+    this.extraContexts.set(name, ctx);
+    this.switchContext(name);
+  }
+
+  switchContext(name: string): void {
+    if (name !== 'default' && !this.extraContexts.has(name)) {
+      throw new Error(`No context named ${JSON.stringify(name)}`);
+    }
+    this.activeContextName = name;
+    this.page = null;
+    this.cdp = null;
+  }
+
+  async closeContext(name: string): Promise<void> {
+    if (name === 'default') {
+      throw new Error('The default context cannot be closed this way — use browser_close');
+    }
+    const ctx = this.extraContexts.get(name);
+    if (!ctx) throw new Error(`No context named ${JSON.stringify(name)}`);
+    await ctx.close().catch(() => {});
+    this.extraContexts.delete(name);
+    if (this.activeContextName === name) {
+      this.activeContextName = 'default';
+      this.page = null;
+      this.cdp = null;
+    }
+  }
+
+  listContexts(): Array<{ name: string; active: boolean; tabs: number; type: string }> {
+    const out = [
+      {
+        name: 'default',
+        active: this.activeContextName === 'default',
+        tabs: this.context ? this.context.pages().length : 0,
+        type: this.ephemeral ? 'ephemeral' : 'persistent profile',
+      },
+    ];
+    for (const [name, ctx] of this.extraContexts) {
+      out.push({
+        name,
+        active: this.activeContextName === name,
+        tabs: ctx.pages().length,
+        type: 'isolated (in-memory)',
+      });
+    }
+    return out;
+  }
+
+  getActiveContextName(): string {
+    return this.activeContextName;
   }
 
   async getCdp(): Promise<CDPSession> {
@@ -308,6 +397,9 @@ class BrowserManager {
   }
 
   getAllPages(): Page[] {
+    if (this.activeContextName !== 'default') {
+      return this.extraContexts.get(this.activeContextName)?.pages() ?? [];
+    }
     return this.context ? this.context.pages() : [];
   }
 
@@ -325,6 +417,15 @@ class BrowserManager {
 
   private async closeInternal() {
     this.cdp = null;
+    for (const ctx of this.extraContexts.values()) {
+      await ctx.close().catch(() => {});
+    }
+    this.extraContexts.clear();
+    this.activeContextName = 'default';
+    if (this.isolatedBrowser) {
+      await this.isolatedBrowser.close().catch(() => {});
+      this.isolatedBrowser = null;
+    }
     if (this.context) {
       await this.context.close().catch(() => {});
       this.context = null;

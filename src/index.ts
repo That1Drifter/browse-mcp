@@ -81,6 +81,7 @@ const TOOL_BUNDLES: Record<string, string[]> = {
     'browser_drag',
     'browser_save_state',
     'browser_load_state',
+    'browser_context',
   ],
 };
 // Coordinate (vision) tools are opt-in: excluded from the default expose-all

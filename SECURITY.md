@@ -167,3 +167,5 @@ Blocked attempts are logged to `issues.jsonl`.
 | CI / shared machine / untrusted agent runs | `BROWSE_MCP_EPHEMERAL=1` |
 | One-off task against a high-value account | Default, then `browser_reset_profile` after |
 | Multiple unrelated projects on one machine | Per-project `BROWSE_MCP_HOME` |
+| Visiting untrusted pages mid-session while the profile holds auth | `browser_context` open — isolated context shares no cookies/auth with the profile |
+| Autonomous agent that should only reach known sites | `BROWSE_MCP_ALLOWED_ORIGINS` |

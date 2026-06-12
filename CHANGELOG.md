@@ -9,6 +9,7 @@ as described in [VERSIONING.md](./VERSIONING.md).
 ## [Unreleased]
 
 ### Added
+- Per-session isolated contexts (#39): `browser_context` opens/switches/closes/lists named incognito-style contexts that share nothing with the persistent profile (no cookies/auth). All tools act on the active context; tabs are scoped to it; the stealth init script and origin fence apply per context. Isolated contexts are in-memory only and are lost on `browser_close`/`browser_handoff`. Pair with `browser_load_state` to inject scoped auth into a clean context. `session` bundle grows to 16 (46 default tools).
 - `publish` GitHub Actions workflow: tag pushes (`v*`) build, test, and publish to npm via OIDC trusted publishing (no stored token). Release process in VERSIONING.md updated.
 
 ## [0.6.0] - 2026-06-12
