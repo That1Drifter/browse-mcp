@@ -1,10 +1,11 @@
 # browse-mcp
 
 [![build](https://github.com/That1Drifter/browse-mcp/actions/workflows/build.yml/badge.svg)](https://github.com/That1Drifter/browse-mcp/actions/workflows/build.yml)
+[![npm](https://img.shields.io/npm/v/browse-mcp.svg)](https://www.npmjs.com/package/browse-mcp)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](https://nodejs.org)
 
-A headless-browser MCP server for any MCP-capable agent: Claude Code/Desktop, Codex CLI, Gemini CLI, Cursor, VS Code, or anything else that speaks [MCP](https://modelcontextprotocol.io) over stdio. Playwright-based, with accessibility-tree refs, Readability article extraction, search without an API key, a research macro that bundles search-and-read into one call, annotated screenshots, and a self-improvement feedback loop. Runs on Windows, Linux, and macOS.
+A headless-browser MCP server for any MCP-capable agent: Claude Code/Desktop, Codex CLI, Gemini CLI, Cursor, VS Code, or anything else that speaks [MCP](https://modelcontextprotocol.io) over stdio. Playwright-based, with accessibility-tree refs, Readability article extraction, PDF text extraction, search without an API key, a research macro that bundles search-and-read into one call, annotated screenshots, and a self-improvement feedback loop. Doubles as a [CLI](#cli) (`npx browse-mcp read <url>`) for token-light shell use. Runs on Windows, Linux, and macOS.
 
 ## Project status
 
