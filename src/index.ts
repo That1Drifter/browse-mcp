@@ -64,6 +64,7 @@ const TOOL_BUNDLES: Record<string, string[]> = {
     'browser_review_issues',
   ],
   edit: ['browser_modify_style', 'browser_undo_style', 'browser_cleanup'],
+  vision: ['browser_click_xy', 'browser_move_xy', 'browser_drag_xy'],
   session: [
     'browser_tabs',
     'browser_switch_tab',
@@ -82,9 +83,13 @@ const TOOL_BUNDLES: Record<string, string[]> = {
     'browser_load_state',
   ],
 };
+// Coordinate (vision) tools are opt-in: excluded from the default expose-all
+// payload to protect the schema budget. Request via BROWSE_MCP_TOOLS=vision
+// (or by tool name).
+const OPT_IN_TOOLS = new Set(TOOL_BUNDLES.vision);
 function filterTools(all: ToolDef[]): ToolDef[] {
   const raw = process.env.BROWSE_MCP_TOOLS;
-  if (!raw) return all;
+  if (!raw) return all.filter((t) => !OPT_IN_TOOLS.has(t.name));
   const allowed = new Set<string>();
   for (const tok of raw
     .split(',')
