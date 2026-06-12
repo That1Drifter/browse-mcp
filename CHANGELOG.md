@@ -8,6 +8,8 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-12
+
 ### Added
 - Timeout and not-found errors from `browser_wait_for`, `browser_wait_for_text`, and `browser_find_text` now append page context: current URL, `document.readyState`, title, and a 300-char body excerpt, plus the existing bot-detection heads-up when the page looks like a CAPTCHA/Cloudflare interstitial. Driven by `issues.jsonl` entries where the agent retried longer timeouts against a challenge page it could not see.
 - `networkidle` waits that time out now explain that the state often never fires on pages with analytics/websockets and suggest `load` or a selector wait; the `wait_until`/`state` schema descriptions carry the same warning.
