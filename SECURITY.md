@@ -124,15 +124,20 @@ On Windows, the default per-user profile path inherits user-only ACLs, which
 is usually adequate against other local users but **not** against malware
 running as you.
 
-### 7. Playwright `storageState` for explicit, auditable auth reuse
+### 7. `browser_save_state` / `browser_load_state` for explicit, auditable auth reuse
 
 If you want persistent auth for *specific* sites only — without giving every
-agent run implicit access to everything — Playwright's `storageState` API
-lets you export and reimport a scoped set of cookies/localStorage from a
-JSON file you control. That's outside the scope of browse-mcp's built-in
-tools today, but it's the pattern to reach for if the default persistent
-profile is too broad for your threat model. See the Playwright docs on
-[authentication](https://playwright.dev/docs/auth) for details.
+agent run implicit access to everything — the `browser_save_state` and
+`browser_load_state` tools export and reimport cookies + localStorage as a
+JSON file you control (default `~/.browse-mcp/state/<name>.json`, written
+with `0600` permissions where the OS supports it). Combine with
+`BROWSE_MCP_EPHEMERAL=1` for a profile that starts empty and gets exactly
+the auth you load into it.
+
+**The exported file contains live session tokens.** Anyone who reads it can
+hijack those sessions until they expire. Treat it like a password file: do
+not commit it, do not transfer it over untrusted channels, delete it when
+no longer needed.
 
 ### 8. Origin fence for autonomous agents
 

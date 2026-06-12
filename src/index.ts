@@ -78,6 +78,8 @@ const TOOL_BUNDLES: Record<string, string[]> = {
     'browser_file_upload',
     'browser_handle_dialog',
     'browser_drag',
+    'browser_save_state',
+    'browser_load_state',
   ],
 };
 function filterTools(all: ToolDef[]): ToolDef[] {
