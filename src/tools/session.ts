@@ -66,6 +66,26 @@ export const session: ToolModule = {
       },
     },
     {
+      name: 'browser_context',
+      description:
+        'Manage isolated browser contexts (incognito-style). "open" creates a named in-memory context that shares NOTHING with the persistent profile — no cookies, no auth — and switches to it. "switch" changes which context all other tools act on. "close" destroys one. "list" shows contexts with tab counts. Isolated contexts are lost on browser_close and browser_handoff. Combine with browser_load_state to inject scoped auth into a clean context.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: ['open', 'switch', 'close', 'list'],
+            description: 'What to do',
+          },
+          name: {
+            type: 'string',
+            description: 'Context name (required for open/switch/close)',
+          },
+        },
+        required: ['action'],
+      },
+    },
+    {
       name: 'browser_save_state',
       description:
         'Export the session storage state (cookies + localStorage) to a JSON file so auth can be moved to another machine or restored later. WARNING: the file contains live session tokens — treat it like a password file. Default location: ~/.browse-mcp/state/<name>.json.',
@@ -166,6 +186,36 @@ export const session: ToolModule = {
       return text(
         `Downloaded ${result.filename}\n  path: ${result.path}\n  size: ${result.sizeBytes} bytes\n  from: ${result.url}`,
       );
+    },
+
+    async browser_context(a) {
+      if (a.action === 'list') {
+        await browser.getPage();
+        return text(JSON.stringify(browser.listContexts(), null, 2));
+      }
+      const name = (a.name ?? '').trim();
+      if (!/^[A-Za-z0-9._-]+$/.test(name)) {
+        return text(
+          `Action ${JSON.stringify(a.action)} needs a name (letters, digits, dot, dash, underscore).`,
+          true,
+        );
+      }
+      if (a.action === 'open') {
+        await browser.openIsolatedContext(name);
+        return text(
+          `Opened isolated context "${name}" and switched to it. Clean slate: no cookies/auth from the persistent profile. In-memory only — lost on browser_close/browser_handoff.`,
+        );
+      }
+      if (a.action === 'switch') {
+        browser.switchContext(name);
+        const page = await browser.getPage();
+        return text(`Switched to context "${name}" — active tab: ${page.url()}`);
+      }
+      if (a.action === 'close') {
+        await browser.closeContext(name);
+        return text(`Closed context "${name}". Now on "${browser.getActiveContextName()}".`);
+      }
+      return text(`Unknown action: ${a.action}`, true);
     },
 
     async browser_save_state(a) {
