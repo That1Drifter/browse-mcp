@@ -8,6 +8,8 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-06-13
+
 ### Security
 - Confine caller-supplied write destinations to the browse-mcp data roots (CWE-22, reported privately by novice-22). `browser_download`'s `save_dir` is now resolved under `~/.browse-mcp/downloads` and `browser_save_state` / `browser_load_state`'s explicit `path` under `~/.browse-mcp/state`; absolute paths and `..` escapes are rejected, and download filenames are reduced to a bare basename. Previously a caller (a malicious MCP client, or an agent steered by indirect prompt injection) could pass an arbitrary `save_dir` and a URL whose body became the file contents, writing attacker-controlled bytes to any path (e.g. `~/.bashrc`). Relocate the roots with `BROWSE_MCP_HOME`. The `force_fetch` fallback now also honours `BROWSE_MCP_ALLOWED_ORIGINS` / `BROWSE_MCP_BLOCKED_ORIGINS`, which its raw `fetch()` previously bypassed.
 

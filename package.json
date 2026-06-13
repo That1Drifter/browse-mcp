@@ -1,6 +1,6 @@
 {
   "name": "browse-mcp",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Headless-browser MCP server for any MCP-capable agent (Claude, Codex, Gemini CLI, Cursor, ...). Playwright-based, with accessibility-tree refs, Readability, search, annotated screenshots, and a self-improvement feedback loop. Windows, Linux, and macOS.",
   "license": "MIT",
   "author": "Roger Maxwell (That1Drifter) <americanemt@gmail.com>",
