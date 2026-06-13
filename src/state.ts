@@ -1,5 +1,6 @@
 import { homedir } from 'os';
 import { join } from 'path';
+import { confineToDir } from './pathSafe.js';
 
 // Storage-state file handling (path resolution + shape validation) for
 // browser_save_state / browser_load_state. Pure logic lives here for tests;
@@ -10,7 +11,11 @@ export const STATE_DIR = process.env.BROWSE_MCP_HOME
   : join(homedir(), '.browse-mcp', 'state');
 
 export function resolveStatePath(opts: { name?: string; path?: string }): string {
-  if (opts.path) return opts.path;
+  // An explicit path may point at a file under the state dir (relocatable via
+  // BROWSE_MCP_HOME), but absolute paths and ".." escapes outside it are
+  // rejected: the caller can be a prompt-injected agent, and these tools write
+  // (save) or read (load) the path. See pathSafe.ts / SECURITY.md.
+  if (opts.path) return confineToDir(STATE_DIR, opts.path);
   const name = (opts.name ?? 'default').trim();
   if (!/^[A-Za-z0-9._-]+$/.test(name)) {
     throw new Error(

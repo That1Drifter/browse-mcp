@@ -3,6 +3,8 @@ import { mkdirSync, existsSync, statSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join, basename } from 'path';
 import { createHash } from 'crypto';
+import { confineToDir, safeBasename } from './pathSafe.js';
+import { parseFenceEnv, checkUrlAllowed } from './fence.js';
 
 const DEFAULT_DIR = process.env.BROWSE_MCP_HOME
   ? join(process.env.BROWSE_MCP_HOME, 'downloads')
@@ -38,7 +40,20 @@ export async function downloadUrl(
     forceFetch = !!saveDirOrOpts.forceFetch;
   }
 
-  const dir = saveDir || DEFAULT_DIR;
+  // Reject blocked origins before any navigation or fetch. The Playwright
+  // route backstop fences page.goto(), but the force_fetch fallback uses raw
+  // fetch() and would otherwise bypass BROWSE_MCP_ALLOWED_ORIGINS — close that
+  // gap here so both download paths honour the fence.
+  const verdict = checkUrlAllowed(url, parseFenceEnv());
+  if (!verdict.allowed) {
+    throw new Error(`Refusing to download blocked URL: ${verdict.reason}`);
+  }
+
+  // Confine the destination to the download root. save_dir may name a
+  // subdirectory under it, but absolute paths and ".." escapes are rejected so
+  // a steered caller cannot write outside ~/.browse-mcp/downloads (relocatable
+  // via BROWSE_MCP_HOME). See SECURITY.md / pathSafe.ts.
+  const dir = confineToDir(DEFAULT_DIR, saveDir);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
   // Set up the download listener BEFORE triggering navigation. Short timeout
@@ -65,7 +80,9 @@ export async function downloadUrl(
   }
 
   const suggested =
-    download.suggestedFilename() || basename(new URL(url).pathname) || 'download.bin';
+    safeBasename(download.suggestedFilename()) ||
+    safeBasename(basename(new URL(url).pathname)) ||
+    'download.bin';
   const outPath = join(dir, suggested);
   await download.saveAs(outPath);
 
@@ -88,11 +105,11 @@ async function fetchFallback(url: string, dir: string): Promise<DownloadResult> 
 
   let filename = '';
   try {
-    filename = basename(new URL(url).pathname);
+    filename = safeBasename(basename(new URL(url).pathname));
   } catch {
     /* ignore */
   }
-  if (!filename || filename === '/' || !/\.[A-Za-z0-9]+$/.test(filename)) {
+  if (!filename || !/\.[A-Za-z0-9]+$/.test(filename)) {
     const hash = createHash('sha1').update(url).digest('hex').slice(0, 12);
     const ext = extForContentType(contentType);
     filename = `fetched-${hash}${ext}`;

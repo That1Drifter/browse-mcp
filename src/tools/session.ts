@@ -54,7 +54,8 @@ export const session: ToolModule = {
           url: { type: 'string', description: 'URL to download' },
           save_dir: {
             type: 'string',
-            description: 'Optional directory (default: ~/.browse-mcp/downloads)',
+            description:
+              'Optional subdirectory under the download root ~/.browse-mcp/downloads (default: the root itself). Confined to that root: absolute paths and ".." escapes are rejected. Relocate the root with BROWSE_MCP_HOME.',
           },
           force_fetch: {
             type: 'boolean',
@@ -93,7 +94,11 @@ export const session: ToolModule = {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'State name (default "default")' },
-          path: { type: 'string', description: 'Explicit file path (overrides name)' },
+          path: {
+            type: 'string',
+            description:
+              'Explicit file path under the state dir ~/.browse-mcp/state (overrides name). Confined to that dir: absolute paths and ".." escapes are rejected. Relocate it with BROWSE_MCP_HOME.',
+          },
         },
       },
     },
@@ -105,7 +110,11 @@ export const session: ToolModule = {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'State name (default "default")' },
-          path: { type: 'string', description: 'Explicit file path (overrides name)' },
+          path: {
+            type: 'string',
+            description:
+              'Explicit file path under the state dir ~/.browse-mcp/state (overrides name). Confined to that dir: absolute paths and ".." escapes are rejected. Relocate it with BROWSE_MCP_HOME.',
+          },
         },
       },
     },

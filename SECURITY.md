@@ -51,7 +51,13 @@ Override with the `BROWSE_MCP_HOME` env var — the profile will live at
   agent to another authenticated tab and take actions there — and
   `browser_eval` means a steered agent can run arbitrary JS in any page it
   reaches, including authenticated ones. The hardened recipe below is the
-  countermeasure set.
+  countermeasure set. The blast radius stays *inside the browser*: tools that
+  write to disk confine their destination to the browse-mcp data roots —
+  `browser_download`'s `save_dir` resolves under `~/.browse-mcp/downloads` and
+  `browser_save_state` / `browser_load_state`'s `path` under
+  `~/.browse-mcp/state`, with absolute paths and `..` escapes rejected — so a
+  steered agent cannot turn a download into an arbitrary host-file write (e.g.
+  `~/.bashrc`). Relocate the roots with `BROWSE_MCP_HOME`.
 - **Leftover auth after sensitive work.** Auth survives process exit. If you
   signed into a high-value account (bank, cloud console, email) for a
   one-off task, those cookies are still on disk days later.
