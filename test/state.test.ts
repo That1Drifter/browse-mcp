@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { sep } from 'path';
-import { resolveStatePath, validateStorageState, summarizeState } from '../src/state.js';
+import { sep, join, resolve } from 'path';
+import {
+  resolveStatePath,
+  validateStorageState,
+  summarizeState,
+  STATE_DIR,
+} from '../src/state.js';
 
 describe('resolveStatePath', () => {
   it('defaults to default.json in the state dir', () => {
@@ -11,8 +16,23 @@ describe('resolveStatePath', () => {
     expect(resolveStatePath({ name: 'work-acct' })).toMatch(/work-acct\.json$/);
   });
 
-  it('explicit path wins over name', () => {
-    expect(resolveStatePath({ name: 'x', path: 'C:/tmp/s.json' })).toBe('C:/tmp/s.json');
+  it('explicit path wins over name and is confined under the state dir', () => {
+    expect(resolveStatePath({ name: 'x', path: 'work.json' })).toBe(join(STATE_DIR, 'work.json'));
+    const abs = join(STATE_DIR, 'sub', 'work.json');
+    expect(resolveStatePath({ path: abs })).toBe(abs);
+  });
+
+  it('rejects an explicit path that escapes the state dir', () => {
+    expect(() => resolveStatePath({ path: '../../etc/passwd' })).toThrow(
+      /outside the allowed directory/,
+    );
+    expect(() => resolveStatePath({ path: `${sep}etc${sep}passwd` })).toThrow(
+      /outside the allowed directory/,
+    );
+    // A sibling dir sharing the prefix must not slip through.
+    expect(() => resolveStatePath({ path: resolve(STATE_DIR, '..', 'state-evil', 'x.json') })).toThrow(
+      /outside the allowed directory/,
+    );
   });
 
   it('rejects names with path separators or traversal', () => {
