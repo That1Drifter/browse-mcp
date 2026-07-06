@@ -1,0 +1,84 @@
+// BROWSE_MCP_TOOLS env filter: comma-separated list of tool names OR named
+// bundles (lean, core, search, content, visual, debug, edit, session). Lets
+// users cut the ~6K-token schema payload when their MCP client loads
+// everything up front. Default: expose all tools except the opt-in ones.
+import type { ToolDef } from './tools/types.js';
+
+export const TOOL_BUNDLES: Record<string, string[]> = {
+  core: [
+    'browser_navigate',
+    'browser_navigate_back',
+    'browser_navigate_forward',
+    'browser_snapshot',
+    'browser_click',
+    'browser_type',
+    'browser_select_option',
+    'browser_press_key',
+    'browser_wait_for',
+    'browser_eval',
+    'browser_close',
+  ],
+  search: ['browser_search', 'browser_search_news', 'browser_search_images', 'browser_research'],
+  content: ['browser_read', 'browser_links', 'browser_extract_listings'],
+  visual: ['browser_screenshot', 'browser_screenshot_annotated', 'browser_responsive'],
+  debug: [
+    'browser_console',
+    'browser_network',
+    'browser_a11y_audit',
+    'browser_inspect_css',
+    'browser_report_difficulty',
+    'browser_review_issues',
+  ],
+  edit: ['browser_modify_style', 'browser_undo_style', 'browser_cleanup'],
+  vision: ['browser_click_xy', 'browser_move_xy', 'browser_drag_xy'],
+  session: [
+    'browser_tabs',
+    'browser_switch_tab',
+    'browser_handoff',
+    'browser_resume',
+    'browser_download',
+    'browser_reset_profile',
+    'browser_hover',
+    'browser_scroll',
+    'browser_find_text',
+    'browser_wait_for_text',
+    'browser_file_upload',
+    'browser_handle_dialog',
+    'browser_drag',
+    'browser_save_state',
+    'browser_load_state',
+    'browser_context',
+  ],
+};
+
+// `lean` preset (#56): the read/research/automate core for clients without
+// lazy tool loading; cuts the schema payload to roughly half the default.
+// Composed from the bundles above so it can't drift out of sync. Usage
+// measurement showed the web-dev-helper tools (edit, inspect_css, a11y_audit,
+// responsive, console/network) serve a different audience and stay opt-in.
+TOOL_BUNDLES.lean = [
+  ...TOOL_BUNDLES.core.filter((n) => n !== 'browser_navigate_forward'),
+  ...TOOL_BUNDLES.search,
+  ...TOOL_BUNDLES.content,
+  'browser_screenshot',
+  'browser_scroll',
+  'browser_find_text',
+];
+
+// Coordinate (vision) tools are opt-in: excluded from the default expose-all
+// payload to protect the schema budget. Request via BROWSE_MCP_TOOLS=vision
+// (or by tool name).
+export const OPT_IN_TOOLS = new Set(TOOL_BUNDLES.vision);
+
+export function filterTools(all: ToolDef[], raw = process.env.BROWSE_MCP_TOOLS): ToolDef[] {
+  if (!raw) return all.filter((t) => !OPT_IN_TOOLS.has(t.name));
+  const allowed = new Set<string>();
+  for (const tok of raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)) {
+    if (TOOL_BUNDLES[tok]) for (const n of TOOL_BUNDLES[tok]) allowed.add(n);
+    else allowed.add(tok);
+  }
+  return all.filter((t) => allowed.has(t.name));
+}

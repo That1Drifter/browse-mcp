@@ -176,20 +176,26 @@ Installing browse-mcp pulls in Playwright's bundled Chromium (~150 MB) via the `
 
 All 46 default tools exposed at once is roughly **6.1K tokens / 24.5 KB** of schema — about 6% of a 100K context window, before any actual work.
 
-Clients that support **lazy tool loading** (Claude Code's `ToolSearch` does) don't pay this up front. For clients that don't, restrict the exposed list via the `BROWSE_MCP_TOOLS` env var:
+Clients that support **lazy tool loading** (Claude Code's `ToolSearch` does) don't pay this up front. For clients that don't, restrict the exposed list via the `BROWSE_MCP_TOOLS` env var. The recommended starting point is the `lean` preset:
 
 ```bash
+# Recommended for non-lazy clients: the read/research/automate core
+# (20 tools, ~3.1K tokens / 12.4 KB, about half the default payload)
+BROWSE_MCP_TOOLS=lean
+
 # Named bundles (union of tools):
 BROWSE_MCP_TOOLS=core,search,content
 
 # Or specific tools:
 BROWSE_MCP_TOOLS=browser_navigate,browser_snapshot,browser_read,browser_search
 
-# Or mix:
-BROWSE_MCP_TOOLS=core,browser_research
+# Or mix (add tools/bundles on top of a preset):
+BROWSE_MCP_TOOLS=lean,browser_download,debug
 ```
 
-Bundles: `core` (nav/history/snapshot/click/type/select/eval/wait/close, 11 tools), `search` (4), `content` (3), `visual` (3), `debug` (6), `edit` (3), `session` (16), `vision` (3 coordinate tools, **opt-in only**). Omit the var to expose everything except `vision`; the coordinate tools must be requested explicitly (`BROWSE_MCP_TOOLS=vision` or by name) so they never cost schema budget unless wanted.
+`lean` covers navigation, snapshot, click/type/select/press-key, wait, eval, close, all four search/research tools, read/links/listings extraction, screenshot, scroll, and find-text. It deliberately leaves out the web-dev-helper tools (`edit` bundle, CSS inspection, a11y audit, responsive testing, console/network) and the session extras; add those back by bundle or name if you need them.
+
+Bundles: `lean` (the 20-tool preset above), `core` (nav/history/snapshot/click/type/select/eval/wait/close, 11 tools), `search` (4), `content` (3), `visual` (3), `debug` (6), `edit` (3), `session` (16), `vision` (3 coordinate tools, **opt-in only**). Omit the var to expose everything except `vision`; the coordinate tools must be requested explicitly (`BROWSE_MCP_TOOLS=vision` or by name) so they never cost schema budget unless wanted.
 
 ## Configuration
 
