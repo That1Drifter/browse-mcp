@@ -8,6 +8,12 @@ as described in [VERSIONING.md](./VERSIONING.md).
 
 ## [Unreleased]
 
+### Added
+- `BROWSE_MCP_TOOLS=lean` preset (#56): a 20-tool read/research/automate core (~3.1K tokens / 12.4 KB of schema, about half the 46-tool default) recommended for MCP clients without lazy tool loading. Composed of `core` (minus `browser_navigate_forward`), `search`, `content`, plus `browser_screenshot`, `browser_scroll`, and `browser_find_text`. Default exposure is unchanged; combine as `BROWSE_MCP_TOOLS=lean,<more>` to add tools back.
+
+### Changed
+- Tool exposure filtering (`BROWSE_MCP_TOOLS` parsing, bundle definitions) moved from `index.ts` to `toolFilter.ts` so it is unit-testable; behavior unchanged.
+
 ## [0.8.2] - 2026-06-13
 
 ### Security
